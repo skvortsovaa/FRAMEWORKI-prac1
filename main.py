@@ -1,168 +1,191 @@
-import datetime
-import random
+"""Консольное меню SmartSpace Monitor и вывод результатов."""
 
-room_name = "Серверная №1"
-room_floor = 3
-room_area = 25.5
-sensor_id = "SENS-001"
-sensor_active = True
-sensor_battery_level = 85
+from copy import deepcopy
+from pathlib import Path
 
-# Демонстрационные пороги температуры (°C) и влажности (%).
-metric_min_normal = 18.0
-metric_max_normal = 24.0
-humidity_min_normal = 40.0
-humidity_max_normal = 60.0
+from monitoring import check_room
+from rooms import (
+    add_room, find_rooms, get_room, iter_rooms_on_floor,
+    sort_rooms, update_sensor,
+)
+from storage import load_data, save_data
+from utils import input_float, input_int
 
 
-def validate_settings(area, battery, temperature_min, temperature_max, humidity_min, humidity_max):
-    if area <= 0:
-        raise SystemExit("Ошибка: площадь помещения должна быть больше нуля.")
-    if not 0 <= battery <= 100:
-        raise SystemExit("Ошибка: заряд батареи должен быть от 0 до 100%.")
-    if temperature_min > temperature_max:
-        raise SystemExit("Ошибка: минимум температуры больше максимума.")
-    if not 0 <= humidity_min <= humidity_max <= 100:
-        raise SystemExit("Ошибка: границы влажности должны быть упорядочены и лежать в пределах 0–100%.")
+DATA_FILE = Path(__file__).resolve().parent / "data" / "state.json"
+MENU = """
+SMARTSPACE MONITOR — учебная симуляция
+1. Показать помещения
+2. Добавить помещение
+3. Найти по названию
+4. Показать помещения по площади
+5. Показать помещения на этаже
+6. Изменить состояние датчика
+7. Проверить одно помещение (сценарий ПР1)
+8. Проверить все помещения
+9. Показать историю проверок
+0. Выход
+"""
+RECOMMENDATIONS = {
+    "НЕТ ДАННЫХ": "Восстановите работу датчика и повторите проверку.",
+    "АВАРИЯ": "Протечка: немедленно сообщите службе эксплуатации.",
+    "ПРЕДУПРЕЖДЕНИЕ": "Есть отклонения микроклимата. Проверьте параметры.",
+    "НОРМА": "Показатели помещения в норме.",
+}
+METRIC_ADVICE = {
+    "Температура": {
+        "below": "Проверьте настройки отопления и охлаждения.",
+        "above": "Проверьте вентиляцию и кондиционирование.",
+    },
+    "Влажность": {
+        "below": "Проверьте систему увлажнения воздуха.",
+        "above": "Проверьте вентиляцию и источники избыточной влаги.",
+    },
+}
 
 
-def print_room_info(name, floor, area, check_time):
-    print("=" * 60)
-    print("SMARTSPACE MONITOR — Система мониторинга помещений")
-    print("=" * 60)
-    print("Учебная симуляция. Пороги заданы для примера.")
-    print(f"Время проверки: {check_time.strftime('%d.%m.%Y %H:%M:%S')}")
-    print()
-    print("ИНФОРМАЦИЯ О ПОМЕЩЕНИИ:")
-    print(f"   Название: {name}")
-    print(f"   Этаж: {floor}")
-    print(f"   Площадь: {area} кв.м")
+def show_rooms(rooms: list[dict]) -> None:
+    """Вывести сведения о выбранных помещениях и датчиках."""
+    if not rooms:
+        print("Помещений не найдено.")
+    for room in rooms:
+        sensor = room["sensor"]
+        state = "активен" if sensor["active"] else "неактивен"
+        print(
+            f"{room['id']}. {room['name']} | этаж {room['floor']} | "
+            f"{room['area']} кв.м | {sensor['id']}: {state}, "
+            f"заряд {sensor['battery']}%"
+        )
 
 
-def check_sensor(identifier, active, battery):
-    print()
-    print("ИНФОРМАЦИЯ О ДАТЧИКЕ:")
-    print(f"   ID датчика: {identifier}")
-    print(f"   Статус: {'Активен' if active else 'Неактивен'}")
-    print(f"   Заряд батареи: {battery}%")
-    if not active:
-        print("   ВНИМАНИЕ: датчик неактивен. Проверьте подключение.")
-    if battery == 0:
-        print("   ВНИМАНИЕ: батарея разряжена. Измерения недоступны.")
-    elif battery < 20:
-        print("   ВНИМАНИЕ: низкий заряд. Замените или зарядите батарею.")
-    elif active:
-        print("   Датчик работает нормально.")
-    return active and battery > 0
-
-
-def analyze_temperature(value, minimum, maximum):
-    print(f"   Температура: {value:.2f} °C")
-    print(f"   Норма температуры: {minimum}–{maximum} °C")
-    if value < minimum:
-        deviation = minimum - value
-        print(f"   Температура НИЖЕ нормы на {deviation:.2f} °C.")
-        print("   Рекомендация: проверьте настройки отопления и охлаждения.")
-        return False
-    elif value > maximum:
-        deviation = value - maximum
-        print(f"   Температура ВЫШЕ нормы на {deviation:.2f} °C.")
-        print("   Рекомендация: проверьте вентиляцию и кондиционирование.")
-        return False
+def show_metric(name: str, result: dict, unit: str) -> None:
+    """Вывести уже рассчитанный анализ показателя."""
+    print(
+        f"{name}: {result['value']:.2f}{unit}; "
+        f"норма {result['minimum']}–{result['maximum']}{unit}"
+    )
+    position = result["position"]
+    if result["normal"]:
+        print("В норме. Коррекция не требуется.")
+        if name == "Температура":
+            print(
+                "Отклонение от середины диапазона: "
+                f"{result['deviation']:.2f}{unit}."
+            )
     else:
-        normal_middle = (minimum + maximum) / 2
-        deviation = abs(value - normal_middle)
-        print("   Температура в норме. Коррекция не требуется.")
-        print(f"   Отклонение от середины диапазона: {deviation:.2f} °C.")
-        return True
+        direction = "НИЖЕ" if position == "below" else "ВЫШЕ"
+        deviation_unit = " п.п." if name == "Влажность" else unit
+        print(
+            f"{direction} нормы на "
+            f"{result['deviation']:.2f}{deviation_unit}."
+        )
+        print("Рекомендация:", METRIC_ADVICE[name][position])
 
 
-def analyze_humidity(value, minimum, maximum):
-    print()
-    print(f"   Влажность: {value:.2f}%")
-    print(f"   Норма влажности: {minimum}–{maximum}%")
-    if value < minimum:
-        deviation = minimum - value
-        print(f"   Влажность НИЖЕ нормы на {deviation:.2f} процентного пункта.")
-        print("   Рекомендация: проверьте систему увлажнения воздуха.")
-        return False
-    elif value > maximum:
-        deviation = value - maximum
-        print(f"   Влажность ВЫШЕ нормы на {deviation:.2f} процентного пункта.")
-        print("   Рекомендация: проверьте вентиляцию и источники избыточной влаги.")
-        return False
+def show_report(report: dict) -> None:
+    """Показать подробный результат новой проверки."""
+    print("\n" + "=" * 60)
+    print(f"{report['room_name']} | {report['checked_at']}")
+    print(f"ID отчёта: {report['id']}")
+    if report["temperature"] is None:
+        print("Измерения недоступны: датчик отключён или батарея разряжена.")
     else:
-        print("   Влажность в норме. Коррекция не требуется.")
-        return True
-
-
-def get_room_status(available, temperature_normal, humidity_normal, leak_detected):
-    if not available:
-        return "НЕТ ДАННЫХ"
-    elif leak_detected:
-        return "АВАРИЯ"
-    elif not temperature_normal or not humidity_normal:
-        return "ПРЕДУПРЕЖДЕНИЕ"
-    else:
-        return "НОРМА"
-
-
-def print_report(report_id, status, active, battery):
-    print()
-    print("=" * 60)
-    print("ИТОГОВЫЙ ОТЧЁТ")
-    print("=" * 60)
-    print(f"ID отчёта: {report_id}")
-    print(f"Статус помещения: {status}")
-    if status == "НЕТ ДАННЫХ":
-        recommendation = "Восстановите работу датчика и повторите проверку помещения."
-    elif status == "АВАРИЯ":
-        recommendation = "Обнаружена протечка: немедленно сообщите службе эксплуатации."
-    elif status == "ПРЕДУПРЕЖДЕНИЕ":
-        recommendation = "Есть отклонения микроклимата. Проверьте указанные параметры."
-    else:
-        recommendation = "Показатели помещения в норме."
-    print(f"Рекомендация: {recommendation}")
-    if not active:
+        show_metric("Температура", report["temperature"], " °C")
+        show_metric("Влажность", report["humidity"], "%")
+        leak = "ОБНАРУЖЕНА" if report["leak_detected"] else "не обнаружена"
+        print("Протечка:", leak)
+    print("Статус помещения:", report["status"])
+    print("Рекомендация:", RECOMMENDATIONS[report["status"]])
+    if not report["sensor_active"]:
         print("Обслуживание: проверьте подключение датчика.")
-    if battery < 20:
+    if report["battery"] < 20:
         print("Обслуживание: замените или зарядите батарею датчика.")
     print("=" * 60)
 
 
-def main():
-    validate_settings(
-        room_area, sensor_battery_level, metric_min_normal, metric_max_normal,
-        humidity_min_normal, humidity_max_normal,
-    )
-    current_time = datetime.datetime.now()
-    report_id = "REP-" + str(current_time.year) + "-" + str(random.randint(1000, 9999))
-    print_room_info(room_name, room_floor, room_area, current_time)
-    sensor_available = check_sensor(sensor_id, sensor_active, sensor_battery_level)
+def show_history(reports: list[dict]) -> None:
+    """Вывести сохранённую историю, начиная с последней проверки."""
+    if not reports:
+        print("История проверок пуста.")
+    for report in reversed(reports):
+        print(
+            f"{report['checked_at']} | {report['room_name']} | "
+            f"{report['status']} | {report['id']}"
+        )
 
-    temperature_normal = False
-    humidity_normal = False
-    leak_detected = False
-    print()
-    print("ПОКАЗАНИЯ И АНАЛИЗ:")
-    if sensor_available:
-        # Округляем до анализа, чтобы показанное значение соответствовало статусу.
-        current_temperature = round(random.uniform(16.0, 28.0), 2)
-        current_humidity = round(random.uniform(30.0, 75.0), 2)
-        leak_detected = random.randint(1, 10) == 1
-        temperature_normal = analyze_temperature(
-            current_temperature, metric_min_normal, metric_max_normal,
-        )
-        humidity_normal = analyze_humidity(
-            current_humidity, humidity_min_normal, humidity_max_normal,
-        )
-        print()
-        print(f"   Протечка: {'ОБНАРУЖЕНА' if leak_detected else 'не обнаружена'}")
+
+def perform_action(choice: str, data: dict) -> bool:
+    """Выполнить действие меню; вернуть, требуется ли сохранение."""
+    rooms = data["rooms"]
+    if choice == "1":
+        show_rooms(rooms)
+    elif choice == "2":
+        name = input("Название помещения: ")
+        floor = input_int("Этаж: ")
+        area = input_float("Площадь, кв.м: ")
+        add_room(rooms, name, floor, area)
+        return True
+    elif choice == "3":
+        show_rooms(find_rooms(rooms, input("Часть названия: ")))
+    elif choice == "4":
+        show_rooms(sort_rooms(rooms))
+    elif choice == "5":
+        floor = input_int("Этаж: ")
+        show_rooms(list(iter_rooms_on_floor(rooms, floor)))
+    elif choice == "6":
+        room = get_room(rooms, input_int("ID помещения: "))
+        active = input_int("Датчик активен? 1 — да, 0 — нет: ")
+        if active not in (0, 1):
+            raise ValueError("Для активности введите 0 или 1.")
+        battery = input_int("Заряд батареи, %: ")
+        update_sensor(room, bool(active), battery)
+        return True
+    elif choice in ("7", "8"):
+        if choice == "7":
+            selected = [get_room(rooms, input_int("ID помещения: "))]
+        else:
+            selected = rooms
+        if not selected:
+            print("Сначала добавьте помещение.")
+            return False
+        for room in selected:
+            report = check_room(room)
+            data["reports"].append(report)
+            show_report(report)
+        return True
+    elif choice == "9":
+        show_history(data["reports"])
     else:
-        print("   Измерения не получены: датчик отключён или батарея разряжена.")
+        print("Нет такого пункта меню.")
+    return False
 
-    status = get_room_status(sensor_available, temperature_normal, humidity_normal, leak_detected)
-    print_report(report_id, status, sensor_active, sensor_battery_level)
+
+def main() -> None:
+    """Загрузить данные и обрабатывать команды до выхода."""
+    try:
+        data = load_data(DATA_FILE)
+    except (OSError, ValueError) as error:
+        print(f"Ошибка загрузки: {error}")
+        print("Исправьте файл данных и запустите программу снова.")
+        return
+    while True:
+        try:
+            print(MENU)
+            choice = input("Выберите действие: ").strip()
+            if choice == "0":
+                print("До свидания!")
+                break
+            # Копия защищает текущее состояние при ошибке записи.
+            candidate = deepcopy(data)
+            if perform_action(choice, candidate):
+                save_data(DATA_FILE, candidate)
+                data = candidate
+                print("Изменения сохранены.")
+        except (ValueError, OSError) as error:
+            print(f"Действие не сохранено: {error}")
+        except (EOFError, KeyboardInterrupt):
+            print("\nРабота завершена.")
+            break
 
 
 if __name__ == "__main__":

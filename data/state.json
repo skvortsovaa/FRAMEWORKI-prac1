@@ -1,0 +1,19 @@
+{
+  "rooms": [
+    {
+      "id": 1,
+      "name": "Серверная №1",
+      "floor": 3,
+      "area": 25.5,
+      "sensor": {"id": "SENS-001", "active": true, "battery": 85}
+    },
+    {
+      "id": 2,
+      "name": "Архив",
+      "floor": 2,
+      "area": 40.0,
+      "sensor": {"id": "SENS-002", "active": true, "battery": 15}
+    }
+  ],
+  "reports": []
+}

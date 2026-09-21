@@ -6,6 +6,8 @@ env/
 # Временные файлы Python
 __pycache__/
 *.py[cod]
+.pytest_cache/
+data/*.tmp
 
 # Локальные настройки редакторов
 .idea/
