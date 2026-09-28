@@ -1,0 +1,14 @@
+[
+  {
+    "id": "SENS-001",
+    "active": true,
+    "battery": 85,
+    "room_id": 1
+  },
+  {
+    "id": "SENS-002",
+    "active": true,
+    "battery": 15,
+    "room_id": 2
+  }
+]

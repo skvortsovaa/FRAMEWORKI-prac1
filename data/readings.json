@@ -1,0 +1,35 @@
+[
+  {
+    "id": "READ-a33def096a144c3db47ae04678784f27",
+    "sensor_id": "SENS-001",
+    "metric_id": "temperature",
+    "report_id": "REP-54fa4cd100a2439ca4b7b37524dcc86a",
+    "measured_at": "2026-09-21T10:01:07",
+    "value": 25.83,
+    "minimum": 18.0,
+    "maximum": 24.0,
+    "status": "ПРЕДУПРЕЖДЕНИЕ"
+  },
+  {
+    "id": "READ-aa3ca15c02134e4da834704c47332dd8",
+    "sensor_id": "SENS-001",
+    "metric_id": "humidity",
+    "report_id": "REP-54fa4cd100a2439ca4b7b37524dcc86a",
+    "measured_at": "2026-09-21T10:01:07",
+    "value": 49.96,
+    "minimum": 40.0,
+    "maximum": 60.0,
+    "status": "НОРМА"
+  },
+  {
+    "id": "READ-7a2412372fce4888b32d7e697f605375",
+    "sensor_id": "SENS-001",
+    "metric_id": "leak",
+    "report_id": "REP-54fa4cd100a2439ca4b7b37524dcc86a",
+    "measured_at": "2026-09-21T10:01:07",
+    "value": 0,
+    "minimum": 0.0,
+    "maximum": 0.0,
+    "status": "НОРМА"
+  }
+]

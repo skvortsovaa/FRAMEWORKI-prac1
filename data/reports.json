@@ -1,0 +1,28 @@
+[
+  {
+    "id": "REP-54fa4cd100a2439ca4b7b37524dcc86a",
+    "room_id": 1,
+    "room_name": "Серверная №1",
+    "checked_at": "2026-09-21T10:01:07",
+    "sensor_active": true,
+    "battery": 85,
+    "temperature": {
+      "value": 25.83,
+      "minimum": 18.0,
+      "maximum": 24.0,
+      "normal": false,
+      "position": "above",
+      "deviation": 1.83
+    },
+    "humidity": {
+      "value": 49.96,
+      "minimum": 40.0,
+      "maximum": 60.0,
+      "normal": true,
+      "position": "normal",
+      "deviation": 0.04
+    },
+    "leak_detected": false,
+    "status": "ПРЕДУПРЕЖДЕНИЕ"
+  }
+]

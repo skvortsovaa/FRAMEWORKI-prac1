@@ -4,7 +4,9 @@ import main
 from storage import load_data
 
 
-def test_menu_saves_entities_and_reloads_history(tmp_path, monkeypatch, capsys):
+def test_menu_saves_entities_and_reloads_history(
+    tmp_path, monkeypatch, capsys,
+):
     monkeypatch.setattr(main, "DATA_DIR", tmp_path)
     answers = iter([
         "2", "Тестовая комната", "3", "25,5",

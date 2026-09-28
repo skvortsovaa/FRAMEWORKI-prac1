@@ -1,0 +1,23 @@
+[
+  {
+    "id": "temperature",
+    "name": "Температура",
+    "unit": "°C",
+    "minimum": 18.0,
+    "maximum": 24.0
+  },
+  {
+    "id": "humidity",
+    "name": "Влажность",
+    "unit": "%",
+    "minimum": 40.0,
+    "maximum": 60.0
+  },
+  {
+    "id": "leak",
+    "name": "Протечка",
+    "unit": "0/1",
+    "minimum": 0.0,
+    "maximum": 0.0
+  }
+]
