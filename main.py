@@ -4,15 +4,18 @@ from copy import deepcopy
 from pathlib import Path
 
 from monitoring import check_room
-from rooms import (
+from models.metrics import get_metric, update_limits
+from models.readings import find_readings
+from models.rooms import (
     add_room, find_rooms, get_room, iter_rooms_on_floor,
-    sort_rooms, update_sensor,
+    sort_rooms,
 )
+from models.sensors import add_sensor, get_room_sensor, update_sensor
 from storage import load_data, save_data
 from utils import input_float, input_int
 
 
-DATA_FILE = Path(__file__).resolve().parent / "data" / "state.json"
+DATA_DIR = Path(__file__).resolve().parent / "data"
 MENU = """
 SMARTSPACE MONITOR — учебная симуляция
 1. Показать помещения
@@ -24,6 +27,10 @@ SMARTSPACE MONITOR — учебная симуляция
 7. Проверить одно помещение (сценарий ПР1)
 8. Проверить все помещения
 9. Показать историю проверок
+10. Показать датчики
+11. Показать показатели и нормы
+12. Изменить границы нормы показателя
+13. Показать измерения датчика помещения
 0. Выход
 """
 RECOMMENDATIONS = {
@@ -44,12 +51,12 @@ METRIC_ADVICE = {
 }
 
 
-def show_rooms(rooms: list[dict]) -> None:
+def show_rooms(rooms: list[dict], sensors: list[dict]) -> None:
     """Вывести сведения о выбранных помещениях и датчиках."""
     if not rooms:
         print("Помещений не найдено.")
     for room in rooms:
-        sensor = room["sensor"]
+        sensor = get_room_sensor(sensors, room["id"])
         state = "активен" if sensor["active"] else "неактивен"
         print(
             f"{room['id']}. {room['name']} | этаж {room['floor']} | "
@@ -117,28 +124,31 @@ def show_history(reports: list[dict]) -> None:
 def perform_action(choice: str, data: dict) -> bool:
     """Выполнить действие меню; вернуть, требуется ли сохранение."""
     rooms = data["rooms"]
+    sensors = data["sensors"]
     if choice == "1":
-        show_rooms(rooms)
+        show_rooms(rooms, sensors)
     elif choice == "2":
         name = input("Название помещения: ")
         floor = input_int("Этаж: ")
         area = input_float("Площадь, кв.м: ")
-        add_room(rooms, name, floor, area)
+        room = add_room(rooms, name, floor, area)
+        add_sensor(sensors, rooms, room["id"])
         return True
     elif choice == "3":
-        show_rooms(find_rooms(rooms, input("Часть названия: ")))
+        show_rooms(find_rooms(rooms, input("Часть названия: ")), sensors)
     elif choice == "4":
-        show_rooms(sort_rooms(rooms))
+        show_rooms(sort_rooms(rooms), sensors)
     elif choice == "5":
         floor = input_int("Этаж: ")
-        show_rooms(list(iter_rooms_on_floor(rooms, floor)))
+        show_rooms(list(iter_rooms_on_floor(rooms, floor)), sensors)
     elif choice == "6":
         room = get_room(rooms, input_int("ID помещения: "))
         active = input_int("Датчик активен? 1 — да, 0 — нет: ")
         if active not in (0, 1):
             raise ValueError("Для активности введите 0 или 1.")
         battery = input_int("Заряд батареи, %: ")
-        update_sensor(room, bool(active), battery)
+        sensor = get_room_sensor(sensors, room["id"])
+        update_sensor(sensor, bool(active), battery)
         return True
     elif choice in ("7", "8"):
         if choice == "7":
@@ -149,12 +159,47 @@ def perform_action(choice: str, data: dict) -> bool:
             print("Сначала добавьте помещение.")
             return False
         for room in selected:
-            report = check_room(room)
+            sensor = get_room_sensor(sensors, room["id"])
+            report = check_room(
+                room, sensor, data["metrics"], data["readings"],
+            )
             data["reports"].append(report)
             show_report(report)
         return True
     elif choice == "9":
         show_history(data["reports"])
+    elif choice == "10":
+        if not sensors:
+            print("Датчиков пока нет.")
+        for sensor in sensors:
+            room = get_room(rooms, sensor["room_id"])
+            state = "активен" if sensor["active"] else "неактивен"
+            print(f"{sensor['id']} | {room['name']} | {state} | "
+                  f"заряд {sensor['battery']}%")
+    elif choice == "11":
+        for metric in data["metrics"]:
+            print(f"{metric['id']}: {metric['name']} | "
+                  f"{metric['minimum']}–{metric['maximum']} {metric['unit']}")
+    elif choice == "12":
+        metric = get_metric(data["metrics"], input("ID показателя: ").strip())
+        if metric["id"] == "leak":
+            raise ValueError("Норма протечки фиксирована: 0 (нет протечки).")
+        minimum = input_float("Нижняя граница: ")
+        maximum = input_float("Верхняя граница: ")
+        update_limits(metric, minimum, maximum)
+        return True
+    elif choice == "13":
+        room = get_room(rooms, input_int("ID помещения: "))
+        sensor = get_room_sensor(sensors, room["id"])
+        readings = find_readings(data["readings"], sensor["id"])
+        if not readings:
+            print("Измерений пока нет. Выполните проверку помещения.")
+        for reading in readings:
+            metric = get_metric(data["metrics"], reading["metric_id"])
+            print(f"{reading['measured_at']} | {sensor['id']} | "
+                  f"{metric['name']}: {reading['value']} {metric['unit']} | "
+                  f"норма {reading['minimum']}–{reading['maximum']} | "
+                  f"{reading['status']}")
     else:
         print("Нет такого пункта меню.")
     return False
@@ -163,7 +208,7 @@ def perform_action(choice: str, data: dict) -> bool:
 def main() -> None:
     """Загрузить данные и обрабатывать команды до выхода."""
     try:
-        data = load_data(DATA_FILE)
+        data = load_data(DATA_DIR)
     except (OSError, ValueError) as error:
         print(f"Ошибка загрузки: {error}")
         print("Исправьте файл данных и запустите программу снова.")
@@ -178,7 +223,7 @@ def main() -> None:
             # Копия защищает текущее состояние при ошибке записи.
             candidate = deepcopy(data)
             if perform_action(choice, candidate):
-                save_data(DATA_FILE, candidate)
+                save_data(DATA_DIR, candidate)
                 data = candidate
                 print("Изменения сохранены.")
         except (ValueError, OSError) as error:

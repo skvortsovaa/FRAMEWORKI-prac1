@@ -2,9 +2,9 @@
 
 import pytest
 
-from rooms import (
+from models.rooms import (
     add_room, find_rooms, get_room, iter_rooms_on_floor,
-    sort_rooms, update_sensor,
+    sort_rooms,
 )
 
 
@@ -12,7 +12,7 @@ def test_add_room():
     rooms = []
     add_room(rooms, "Серверная", 3, 25.5)
     assert rooms[0]["name"] == "Серверная"
-    assert rooms[0]["sensor"]["active"] is True
+    assert rooms[0]["id"] == 1
 
 
 def test_find_rooms_ignores_case():
@@ -39,15 +39,6 @@ def test_filter_rooms_by_floor():
 def test_unknown_room():
     with pytest.raises(ValueError, match="не найдено"):
         get_room([], 99)
-
-
-@pytest.mark.parametrize("battery", [-1, 101, True])
-def test_invalid_sensor_update_keeps_old_values(battery):
-    room = add_room([], "Серверная", 3, 25.5)
-    with pytest.raises(ValueError):
-        update_sensor(room, False, battery)
-    assert room["sensor"]["active"] is True
-    assert room["sensor"]["battery"] == 100
 
 
 @pytest.mark.parametrize("area", [0, -1, float("nan"), float("inf")])

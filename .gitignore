@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 data/*.tmp
+data/.save-backup.json
 
 # Локальные настройки редакторов
 .idea/

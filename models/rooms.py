@@ -1,4 +1,4 @@
-"""Хранение и обработка помещений и их датчиков."""
+"""Сущность «Помещение»: проверка, добавление и поиск."""
 
 from math import isfinite
 from typing import Iterator
@@ -18,33 +18,18 @@ def validate_room(room: dict) -> None:
     area = room.get("area")
     if type(area) not in (int, float) or not isfinite(area) or area <= 0:
         raise ValueError("Площадь должна быть конечным числом больше нуля.")
-    sensor = room.get("sensor")
-    if not isinstance(sensor, dict):
-        raise ValueError("У помещения должен быть датчик.")
-    if not isinstance(sensor.get("id"), str) or not sensor["id"].strip():
-        raise ValueError("ID датчика не должен быть пустым.")
-    if type(sensor.get("active")) is not bool:
-        raise ValueError("Активность датчика должна быть True или False.")
-    battery = sensor.get("battery")
-    if type(battery) is not int or not 0 <= battery <= 100:
-        raise ValueError("Заряд батареи должен быть целым числом от 0 до 100.")
 
 
 def add_room(
     rooms: list[dict], name: str, floor: int, area: float,
 ) -> dict:
-    """Добавить помещение с уникальным ID и активным датчиком."""
+    """Добавить помещение с уникальным ID."""
     room_id = max((room["id"] for room in rooms), default=0) + 1
     room = {
         "id": room_id,
         "name": name.strip(),
         "floor": floor,
         "area": area,
-        "sensor": {
-            "id": f"SENS-{room_id:03d}",
-            "active": True,
-            "battery": 100,
-        },
     }
     validate_room(room)
     rooms.append(room)
@@ -77,10 +62,3 @@ def iter_rooms_on_floor(rooms: list[dict], floor: int) -> Iterator[dict]:
     for room in rooms:
         if room["floor"] == floor:
             yield room
-
-
-def update_sensor(room: dict, active: bool, battery: int) -> None:
-    """Изменить состояние датчика только после проверки новых данных."""
-    sensor = {**room["sensor"], "active": active, "battery": battery}
-    validate_room({**room, "sensor": sensor})
-    room["sensor"] = sensor
