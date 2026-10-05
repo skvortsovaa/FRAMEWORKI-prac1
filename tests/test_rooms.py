@@ -11,8 +11,8 @@ from models.rooms import (
 def test_add_room():
     rooms = []
     add_room(rooms, "Серверная", 3, 25.5)
-    assert rooms[0]["name"] == "Серверная"
-    assert rooms[0]["id"] == 1
+    assert rooms[0].name == "Серверная"
+    assert rooms[0].id == 1
 
 
 def test_find_rooms_ignores_case():

@@ -1,84 +1,88 @@
-"""Отдельные JSON-коллекции, проверка связей и перенос старых данных."""
+"""Граница JSON и объектной модели; сохранение с резервным журналом."""
 
 from copy import deepcopy
+from dataclasses import asdict
 import json
 from pathlib import Path
+from typing import Any, TypeVar
 
-from models.metrics import default_metrics, validate_metric
-from models.readings import record_report_readings, validate_reading
-from models.rooms import validate_room
-from models.sensors import get_room_sensor, validate_sensor
+from models import Metric, ProjectData, Reading, Report, Room, Sensor
+from models.metrics import MetricAnalysis
+from models.readings import record_report_readings
+from models.sensors import get_room_sensor
+from models.validation import require_text
 
 
 COLLECTIONS = ("rooms", "sensors", "metrics", "readings", "reports")
 JOURNAL = ".save-backup.json"
+T = TypeVar("T")
 
 
-def empty_data() -> dict:
-    """Создать пустой проект с тремя поддерживаемыми показателями."""
-    return {"rooms": [], "sensors": [], "metrics": default_metrics(),
-            "readings": [], "reports": []}
+def empty_data() -> ProjectData:
+    return ProjectData()
 
 
-def validate_data(data: dict) -> None:
-    """Проверить коллекции, уникальность ID и внешние ключи."""
-    if not isinstance(data, dict):
-        raise ValueError("Корень данных должен быть словарём.")
-    validators = {
-        "rooms": validate_room, "sensors": validate_sensor,
-        "metrics": validate_metric, "readings": validate_reading,
-    }
-    ids = {}
-    for collection in COLLECTIONS:
-        if not isinstance(data.get(collection), list):
-            raise ValueError(f"Поле {collection} должно быть списком.")
-        ids[collection] = set()
-        for item in data[collection]:
-            if collection in validators:
-                validators[collection](item)
-            else:
-                if not isinstance(item, dict):
-                    raise ValueError("Запись истории должна быть словарём.")
-                for field in ("id", "room_name", "checked_at", "status"):
-                    value = item.get(field)
-                    if not isinstance(value, str) or not value.strip():
-                        raise ValueError(
-                            f"Некорректное поле истории: {field}.",
-                        )
-            if item["id"] in ids[collection]:
-                raise ValueError(f"Повторяется ID в коллекции {collection}.")
-            ids[collection].add(item["id"])
-    if ids["metrics"] != {"temperature", "humidity", "leak"}:
+def validate_data(data: ProjectData) -> None:
+    """Проверить сущности, уникальность ID и идентичность общих объектов."""
+    if not isinstance(data, ProjectData):
+        raise ValueError("Ожидается объект ProjectData.")
+    types = (Room, Sensor, Metric, Reading, Report)
+    for name, model in zip(COLLECTIONS, types):
+        items = getattr(data, name)
+        if not isinstance(items, list):
+            raise ValueError(f"Коллекция {name} должна быть списком.")
+        ids = set()
+        for item in items:
+            if not isinstance(item, model):
+                raise ValueError(f"Неверный тип объекта в {name}.")
+            item.validate()
+            if item.id in ids:
+                raise ValueError(f"Повторяется ID в коллекции {name}.")
+            ids.add(item.id)
+    rooms = {room.id: room for room in data.rooms}
+    sensors = {sensor.id: sensor for sensor in data.sensors}
+    metrics = {metric.id: metric for metric in data.metrics}
+    reports = {report.id: report for report in data.reports}
+    if set(metrics) != {"temperature", "humidity", "leak"}:
         raise ValueError("Нужны показатели temperature, humidity и leak.")
     sensor_rooms = set()
-    for sensor in data["sensors"]:
-        if sensor["room_id"] not in ids["rooms"]:
-            raise ValueError("Датчик ссылается на неизвестное помещение.")
-        if sensor["room_id"] in sensor_rooms:
+    for sensor in data.sensors:
+        if rooms.get(sensor.room.id) is not sensor.room:
+            raise ValueError("Датчик должен ссылаться на помещение коллекции.")
+        if sensor.room.id in sensor_rooms:
             raise ValueError("У помещения может быть только один датчик.")
-        sensor_rooms.add(sensor["room_id"])
-    if sensor_rooms != ids["rooms"]:
+        sensor_rooms.add(sensor.room.id)
+    if sensor_rooms != set(rooms):
         raise ValueError("У каждого помещения должен быть датчик.")
-    for report in data["reports"]:
-        room_id = report.get("room_id")
-        if type(room_id) is not int or room_id not in ids["rooms"]:
-            raise ValueError("История ссылается на неизвестное помещение.")
-    sensors = {item["id"]: item for item in data["sensors"]}
-    reports = {item["id"]: item for item in data["reports"]}
-    for reading in data["readings"]:
-        for field, collection in (("sensor_id", "sensors"),
-                                  ("metric_id", "metrics"),
-                                  ("report_id", "reports")):
-            if reading[field] not in ids[collection]:
-                raise ValueError(f"Неизвестная связь измерения: {field}.")
-        sensor = sensors[reading["sensor_id"]]
-        report = reports[reading["report_id"]]
-        if sensor["room_id"] != report["room_id"]:
+    for report in data.reports:
+        if rooms.get(report.room.id) is not report.room:
+            raise ValueError("История ссылается на другое помещение.")
+    for reading in data.readings:
+        if sensors.get(reading.sensor.id) is not reading.sensor:
+            raise ValueError("Неизвестная связь измерения: sensor.")
+        if metrics.get(reading.metric.id) is not reading.metric:
+            raise ValueError("Неизвестная связь измерения: metric.")
+        report = reports.get(reading.report_id)
+        if report is None:
+            raise ValueError("Неизвестная связь измерения: report_id.")
+        if reading.sensor.room is not report.room:
             raise ValueError("Измерение и отчёт относятся к разным комнатам.")
+        if reading.measured_at != report.checked_at:
+            raise ValueError("Время измерения не соответствует отчёту.")
+        if reading.metric.id == "leak":
+            if (report.leak_detected is None
+                    or reading.value != int(report.leak_detected)):
+                raise ValueError("Протечка не совпадает с отчётом.")
+        else:
+            result = getattr(report, reading.metric.id)
+            if result is None or (reading.value, reading.minimum,
+                                  reading.maximum) != (
+                    result.value, result.minimum, result.maximum):
+                raise ValueError("Измерение не соответствует отчёту.")
 
 
-def read_json(filename: Path):
-    """Прочитать JSON, представляя ошибки формата как ValueError."""
+def read_json(filename: Path) -> Any:
+    """Прочитать JSON; его структуру проверяет decode_data или миграция."""
     try:
         with filename.open("r", encoding="utf-8") as file:
             return json.load(file)
@@ -86,34 +90,121 @@ def read_json(filename: Path):
         raise ValueError(f"Не удалось прочитать JSON: {filename}") from error
 
 
-def migrate_legacy(legacy: dict) -> dict:
-    """Разделить старое состояние, не меняя исходный словарь и отчёты."""
+def _linked(objects: dict[Any, T], key: Any) -> T:
+    if type(key) not in (int, str) or key not in objects:
+        raise ValueError(f"Неизвестный идентификатор связи: {key!r}.")
+    return objects[key]
+
+
+def _analysis(raw: Any) -> MetricAnalysis | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("Анализ показателя должен быть объектом JSON.")
+    return MetricAnalysis(raw["value"], raw["minimum"], raw["maximum"],
+                          raw["normal"], raw["position"], raw["deviation"])
+
+
+def decode_data(raw: dict[str, Any]) -> ProjectData:
+    """Создать объекты; один ID соответствует одному экземпляру в памяти."""
+    if not isinstance(raw, dict):
+        raise ValueError("Ожидаются JSON-коллекции.")
+    for name in COLLECTIONS:
+        if (not isinstance(raw.get(name), list)
+                or any(not isinstance(row, dict) for row in raw[name])):
+            raise ValueError(f"Неверная структура коллекции {name}.")
+    try:
+        data = ProjectData(
+            rooms=[Room(r["id"], r["name"], r["floor"], r["area"])
+                   for r in raw["rooms"]],
+            metrics=[Metric(m["id"], m["name"], m["unit"],
+                            m["minimum"], m["maximum"])
+                     for m in raw["metrics"]],
+        )
+        rooms = {room.id: room for room in data.rooms}
+        metrics = {metric.id: metric for metric in data.metrics}
+        data.sensors = [
+            Sensor(s["id"], _linked(rooms, s["room_id"]),
+                   s["active"], s["battery"]) for s in raw["sensors"]
+        ]
+        sensors = {sensor.id: sensor for sensor in data.sensors}
+        data.reports = [
+            Report(r["id"], _linked(rooms, r["room_id"]), r["room_name"],
+                   r["checked_at"], r["sensor_active"], r["battery"],
+                   _analysis(r["temperature"]), _analysis(r["humidity"]),
+                   r["leak_detected"], r["status"]) for r in raw["reports"]
+        ]
+        for row in raw["readings"]:
+            require_text(row["status"], "статус измерения")
+        data.readings = [
+            Reading(r["id"], _linked(sensors, r["sensor_id"]),
+                    _linked(metrics, r["metric_id"]), r["value"],
+                    r["report_id"], r["measured_at"], r["minimum"],
+                    r["maximum"], r["status"]) for r in raw["readings"]
+        ]
+        validate_data(data)
+        return data
+    except (KeyError, TypeError) as error:
+        raise ValueError("Некорректные поля в JSON-данных.") from error
+
+
+def encode_data(data: ProjectData) -> dict[str, list[dict[str, Any]]]:
+    """Явно записать поля прежнего формата ПР2 и ID связанных объектов."""
+    validate_data(data)
+    return {
+        "rooms": [
+            {"id": r.id, "name": r.name, "floor": r.floor, "area": r.area}
+            for r in data.rooms
+        ],
+        "sensors": [
+            {"id": s.id, "room_id": s.room.id, "active": s.active,
+             "battery": s.battery} for s in data.sensors
+        ],
+        "metrics": [
+            {"id": m.id, "name": m.name, "unit": m.unit,
+             "minimum": m.minimum, "maximum": m.maximum}
+            for m in data.metrics
+        ],
+        "readings": [
+            {"id": r.id, "sensor_id": r.sensor.id, "metric_id": r.metric.id,
+             "report_id": r.report_id, "measured_at": r.measured_at,
+             "value": r.value, "minimum": r.minimum, "maximum": r.maximum,
+             "status": r.status} for r in data.readings
+        ],
+        "reports": [
+            {"id": r.id, "room_id": r.room.id, "room_name": r.room_name,
+             "checked_at": r.checked_at, "sensor_active": r.sensor_active,
+             "battery": r.battery,
+             "temperature": asdict(r.temperature) if r.temperature else None,
+             "humidity": asdict(r.humidity) if r.humidity else None,
+             "leak_detected": r.leak_detected, "status": r.status}
+            for r in data.reports
+        ],
+    }
+
+
+def migrate_legacy(legacy: dict[str, Any]) -> ProjectData:
+    """Перенести state.json; исходный файл и снимки истории не изменяются."""
     if not isinstance(legacy, dict) or any(
         not isinstance(legacy.get(key), list) for key in ("rooms", "reports")
     ):
         raise ValueError("Неверная структура старого state.json.")
-    data = empty_data()
+    raw = encode_data(empty_data())
     for original in legacy["rooms"]:
         if not isinstance(original, dict):
-            raise ValueError("Помещение должно быть словарём.")
+            raise ValueError("Помещение должно быть объектом JSON.")
         room = deepcopy(original)
         sensor = room.pop("sensor", None)
-        validate_room(room)
-        if not isinstance(sensor, dict):
-            raise ValueError("У старого помещения должен быть датчик.")
+        if not isinstance(sensor, dict) or "id" not in room:
+            raise ValueError("У старого помещения должен быть датчик и ID.")
         sensor["room_id"] = room["id"]
-        data["rooms"].append(room)
-        data["sensors"].append(sensor)
-    data["reports"] = deepcopy(legacy["reports"])
-    validate_data(data)
-    try:
-        for report in data["reports"]:
-            sensor = get_room_sensor(data["sensors"], report["room_id"])
-            record_report_readings(
-                data["readings"], sensor, data["metrics"], report,
-            )
-    except (KeyError, TypeError) as error:
-        raise ValueError("Некорректные показания в старой истории.") from error
+        raw["rooms"].append(room)
+        raw["sensors"].append(sensor)
+    raw["reports"] = deepcopy(legacy["reports"])
+    data = decode_data(raw)
+    for report in data.reports:
+        sensor = get_room_sensor(data.sensors, report.room.id)
+        record_report_readings(data.readings, sensor, data.metrics, report)
     validate_data(data)
     return data
 
@@ -141,7 +232,7 @@ def recover_save(directory: Path) -> None:
     journal.unlink()
 
 
-def load_data(directory: Path) -> dict:
+def load_data(directory: Path) -> ProjectData:
     """Загрузить отдельные файлы; при их отсутствии прочитать state.json."""
     recover_save(directory)
     present = [(directory / f"{name}.json").exists() for name in COLLECTIONS]
@@ -154,15 +245,14 @@ def load_data(directory: Path) -> dict:
         raise ValueError("Неполный набор JSON-файлов в папке данных.")
     data = {name: read_json(directory / f"{name}.json")
             for name in COLLECTIONS}
-    validate_data(data)
-    return data
+    return decode_data(data)
 
 
-def save_data(directory: Path, data: dict) -> None:
+def save_data(directory: Path, data: ProjectData) -> None:
     """Сохранить коллекции с откатом при ошибке или следующем запуске."""
-    validate_data(data)
+    raw = encode_data(data)
     serialized = {
-        name: json.dumps(data[name], ensure_ascii=False, indent=2,
+        name: json.dumps(raw[name], ensure_ascii=False, indent=2,
                          allow_nan=False) + "\n" for name in COLLECTIONS
     }
     directory.mkdir(parents=True, exist_ok=True)

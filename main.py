@@ -4,13 +4,15 @@ from copy import deepcopy
 from pathlib import Path
 
 from monitoring import check_room
-from models.metrics import get_metric, update_limits
+from models.metrics import MetricAnalysis, get_metric
 from models.readings import find_readings
 from models.rooms import (
-    add_room, find_rooms, get_room, iter_rooms_on_floor,
+    Room, add_room, find_rooms, get_room, iter_rooms_on_floor,
     sort_rooms,
 )
-from models.sensors import add_sensor, get_room_sensor, update_sensor
+from models.sensors import Sensor, add_sensor, get_room_sensor
+from models.reports import Report
+from models.state import ProjectData
 from storage import load_data, save_data
 from utils import input_float, input_int
 
@@ -51,80 +53,72 @@ METRIC_ADVICE = {
 }
 
 
-def show_rooms(rooms: list[dict], sensors: list[dict]) -> None:
+def show_rooms(rooms: list[Room], sensors: list[Sensor]) -> None:
     """Вывести сведения о выбранных помещениях и датчиках."""
     if not rooms:
         print("Помещений не найдено.")
     for room in rooms:
-        sensor = get_room_sensor(sensors, room["id"])
-        state = "активен" if sensor["active"] else "неактивен"
-        print(
-            f"{room['id']}. {room['name']} | этаж {room['floor']} | "
-            f"{room['area']} кв.м | {sensor['id']}: {state}, "
-            f"заряд {sensor['battery']}%"
-        )
+        sensor = get_room_sensor(sensors, room.id)
+        print(f"{room} | {sensor}")
 
 
-def show_metric(name: str, result: dict, unit: str) -> None:
+def show_metric(name: str, result: MetricAnalysis, unit: str) -> None:
     """Вывести уже рассчитанный анализ показателя."""
     print(
-        f"{name}: {result['value']:.2f}{unit}; "
-        f"норма {result['minimum']}–{result['maximum']}{unit}"
+        f"{name}: {result.value:.2f}{unit}; "
+        f"норма {result.minimum}–{result.maximum}{unit}"
     )
-    position = result["position"]
-    if result["normal"]:
+    position = result.position
+    if result.normal:
         print("В норме. Коррекция не требуется.")
         if name == "Температура":
             print(
                 "Отклонение от середины диапазона: "
-                f"{result['deviation']:.2f}{unit}."
+                f"{result.deviation:.2f}{unit}."
             )
     else:
         direction = "НИЖЕ" if position == "below" else "ВЫШЕ"
         deviation_unit = " п.п." if name == "Влажность" else unit
         print(
             f"{direction} нормы на "
-            f"{result['deviation']:.2f}{deviation_unit}."
+            f"{result.deviation:.2f}{deviation_unit}."
         )
         print("Рекомендация:", METRIC_ADVICE[name][position])
 
 
-def show_report(report: dict) -> None:
+def show_report(report: Report) -> None:
     """Показать подробный результат новой проверки."""
     print("\n" + "=" * 60)
-    print(f"{report['room_name']} | {report['checked_at']}")
-    print(f"ID отчёта: {report['id']}")
-    if report["temperature"] is None:
+    print(f"{report.room_name} | {report.checked_at}")
+    print(f"ID отчёта: {report.id}")
+    if report.temperature is None:
         print("Измерения недоступны: датчик отключён или батарея разряжена.")
     else:
-        show_metric("Температура", report["temperature"], " °C")
-        show_metric("Влажность", report["humidity"], "%")
-        leak = "ОБНАРУЖЕНА" if report["leak_detected"] else "не обнаружена"
+        show_metric("Температура", report.temperature, " °C")
+        show_metric("Влажность", report.humidity, "%")
+        leak = "ОБНАРУЖЕНА" if report.leak_detected else "не обнаружена"
         print("Протечка:", leak)
-    print("Статус помещения:", report["status"])
-    print("Рекомендация:", RECOMMENDATIONS[report["status"]])
-    if not report["sensor_active"]:
+    print("Статус помещения:", report.status)
+    print("Рекомендация:", RECOMMENDATIONS[report.status])
+    if not report.sensor_active:
         print("Обслуживание: проверьте подключение датчика.")
-    if report["battery"] < 20:
+    if report.battery < 20:
         print("Обслуживание: замените или зарядите батарею датчика.")
     print("=" * 60)
 
 
-def show_history(reports: list[dict]) -> None:
+def show_history(reports: list[Report]) -> None:
     """Вывести сохранённую историю, начиная с последней проверки."""
     if not reports:
         print("История проверок пуста.")
     for report in reversed(reports):
-        print(
-            f"{report['checked_at']} | {report['room_name']} | "
-            f"{report['status']} | {report['id']}"
-        )
+        print(report)
 
 
-def perform_action(choice: str, data: dict) -> bool:
+def perform_action(choice: str, data: ProjectData) -> bool:
     """Выполнить действие меню; вернуть, требуется ли сохранение."""
-    rooms = data["rooms"]
-    sensors = data["sensors"]
+    rooms = data.rooms
+    sensors = data.sensors
     if choice == "1":
         show_rooms(rooms, sensors)
     elif choice == "2":
@@ -132,7 +126,7 @@ def perform_action(choice: str, data: dict) -> bool:
         floor = input_int("Этаж: ")
         area = input_float("Площадь, кв.м: ")
         room = add_room(rooms, name, floor, area)
-        add_sensor(sensors, rooms, room["id"])
+        add_sensor(sensors, rooms, room.id)
         return True
     elif choice == "3":
         show_rooms(find_rooms(rooms, input("Часть названия: ")), sensors)
@@ -147,8 +141,8 @@ def perform_action(choice: str, data: dict) -> bool:
         if active not in (0, 1):
             raise ValueError("Для активности введите 0 или 1.")
         battery = input_int("Заряд батареи, %: ")
-        sensor = get_room_sensor(sensors, room["id"])
-        update_sensor(sensor, bool(active), battery)
+        sensor = get_room_sensor(sensors, room.id)
+        sensor.update_state(bool(active), battery)
         return True
     elif choice in ("7", "8"):
         if choice == "7":
@@ -159,47 +153,39 @@ def perform_action(choice: str, data: dict) -> bool:
             print("Сначала добавьте помещение.")
             return False
         for room in selected:
-            sensor = get_room_sensor(sensors, room["id"])
+            sensor = get_room_sensor(sensors, room.id)
             report = check_room(
-                room, sensor, data["metrics"], data["readings"],
+                room, sensor, data.metrics, data.readings,
             )
-            data["reports"].append(report)
+            data.reports.append(report)
             show_report(report)
         return True
     elif choice == "9":
-        show_history(data["reports"])
+        show_history(data.reports)
     elif choice == "10":
         if not sensors:
             print("Датчиков пока нет.")
         for sensor in sensors:
-            room = get_room(rooms, sensor["room_id"])
-            state = "активен" if sensor["active"] else "неактивен"
-            print(f"{sensor['id']} | {room['name']} | {state} | "
-                  f"заряд {sensor['battery']}%")
+            print(sensor)
     elif choice == "11":
-        for metric in data["metrics"]:
-            print(f"{metric['id']}: {metric['name']} | "
-                  f"{metric['minimum']}–{metric['maximum']} {metric['unit']}")
+        for metric in data.metrics:
+            print(metric)
     elif choice == "12":
-        metric = get_metric(data["metrics"], input("ID показателя: ").strip())
-        if metric["id"] == "leak":
+        metric = get_metric(data.metrics, input("ID показателя: ").strip())
+        if metric.id == "leak":
             raise ValueError("Норма протечки фиксирована: 0 (нет протечки).")
         minimum = input_float("Нижняя граница: ")
         maximum = input_float("Верхняя граница: ")
-        update_limits(metric, minimum, maximum)
+        metric.update_limits(minimum, maximum)
         return True
     elif choice == "13":
         room = get_room(rooms, input_int("ID помещения: "))
-        sensor = get_room_sensor(sensors, room["id"])
-        readings = find_readings(data["readings"], sensor["id"])
+        sensor = get_room_sensor(sensors, room.id)
+        readings = find_readings(data.readings, sensor.id)
         if not readings:
             print("Измерений пока нет. Выполните проверку помещения.")
         for reading in readings:
-            metric = get_metric(data["metrics"], reading["metric_id"])
-            print(f"{reading['measured_at']} | {sensor['id']} | "
-                  f"{metric['name']}: {reading['value']} {metric['unit']} | "
-                  f"норма {reading['minimum']}–{reading['maximum']} | "
-                  f"{reading['status']}")
+            print(reading)
     else:
         print("Нет такого пункта меню.")
     return False

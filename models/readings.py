@@ -1,89 +1,106 @@
-"""Сущность «Измерение»: значение, датчик, показатель и время."""
+"""Измерение связывает объекты датчика и показателя."""
 
-from datetime import datetime
+from dataclasses import dataclass
 from uuid import uuid4
 
-from models.metrics import analyze_metric, get_metric, validate_metric
-from models.sensors import validate_sensor
+from models.metrics import Metric, analyze_metric, get_metric
+from models.reports import Report
+from models.sensors import Sensor
+from models.validation import require_datetime, require_text
 
 
-def validate_reading(reading: dict) -> None:
-    """Проверить измерение вместе со снимком нормы на момент проверки."""
-    if not isinstance(reading, dict):
-        raise ValueError("Измерение должно быть словарём.")
-    for field in ("id", "sensor_id", "metric_id", "report_id", "measured_at"):
-        value = reading.get(field)
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"Некорректное поле измерения: {field}.")
-    try:
-        datetime.fromisoformat(reading["measured_at"])
-    except ValueError as error:
-        raise ValueError("Некорректное время измерения.") from error
-    result = analyze_metric(
-        reading.get("value"), reading.get("minimum"), reading.get("maximum"),
-    )
-    status = "НОРМА" if result["normal"] else "ПРЕДУПРЕЖДЕНИЕ"
-    if reading["metric_id"] == "leak":
-        if reading["value"] not in (0, 1):
-            raise ValueError("Значение протечки должно быть 0 или 1.")
-        if reading["minimum"] != 0 or reading["maximum"] != 0:
-            raise ValueError("Норма протечки должна быть 0.")
-        status = "АВАРИЯ" if reading["value"] else "НОРМА"
-    if reading.get("status") != status:
-        raise ValueError("Статус измерения не соответствует значению.")
+@dataclass
+class Reading:
+    """Значение оценивается по снимку норм, а не по текущему Metric."""
+
+    id: str
+    sensor: Sensor
+    metric: Metric
+    value: float
+    report_id: str
+    measured_at: str
+    minimum: float
+    maximum: float
+    status: str
+
+    def __init__(self, reading_id: str, sensor: Sensor, metric: Metric,
+                 value: float, report_id: str, measured_at: str,
+                 minimum: float, maximum: float,
+                 status: str | None = None) -> None:
+        self.id = reading_id
+        self.sensor = sensor
+        self.metric = metric
+        self.value = value
+        self.report_id = report_id
+        self.measured_at = measured_at
+        self.minimum = minimum
+        self.maximum = maximum
+        if not isinstance(sensor, Sensor) or not isinstance(metric, Metric):
+            raise ValueError("Измерение требует объекты Sensor и Metric.")
+        self.status = self.get_status() if status is None else status
+        self.validate()
+
+    def get_status(self) -> str:
+        result = analyze_metric(self.value, self.minimum, self.maximum)
+        if self.metric.id == "leak":
+            if self.value not in (0, 1):
+                raise ValueError("Значение протечки должно быть 0 или 1.")
+            if self.minimum != 0 or self.maximum != 0:
+                raise ValueError("Норма протечки должна быть 0.")
+            return "АВАРИЯ" if self.value else "НОРМА"
+        return "НОРМА" if result.normal else "ПРЕДУПРЕЖДЕНИЕ"
+
+    def validate(self) -> None:
+        require_text(self.id, "ID измерения")
+        require_text(self.report_id, "ID отчёта измерения")
+        require_datetime(self.measured_at)
+        if (not isinstance(self.sensor, Sensor)
+                or not isinstance(self.metric, Metric)):
+            raise ValueError("Измерение требует объекты Sensor и Metric.")
+        self.sensor.validate()
+        self.metric.validate()
+        if self.status != self.get_status():
+            raise ValueError("Статус измерения не соответствует значению.")
+
+    def __str__(self) -> str:
+        return (f"{self.measured_at} | {self.sensor.id} | "
+                f"{self.metric.name}: {self.value} {self.metric.unit} | "
+                f"норма {self.minimum}–{self.maximum} | {self.status}")
 
 
-def add_reading(
-    readings: list[dict], sensor: dict, metric: dict, value: float,
-    report_id: str, measured_at: str,
-) -> dict:
-    """Добавить измерение со связями и независимым снимком границ нормы."""
-    validate_sensor(sensor)
-    validate_metric(metric)
-    result = analyze_metric(value, metric["minimum"], metric["maximum"])
-    status = "НОРМА" if result["normal"] else "ПРЕДУПРЕЖДЕНИЕ"
-    if metric["id"] == "leak" and value == 1:
-        status = "АВАРИЯ"
-    reading = {
-        "id": f"READ-{uuid4().hex}", "sensor_id": sensor["id"],
-        "metric_id": metric["id"], "report_id": report_id,
-        "measured_at": measured_at, "value": value,
-        "minimum": metric["minimum"], "maximum": metric["maximum"],
-        "status": status,
-    }
-    validate_reading(reading)
+def add_reading(readings: list[Reading], sensor: Sensor, metric: Metric,
+                value: float, report_id: str, measured_at: str) -> Reading:
+    reading = Reading(f"READ-{uuid4().hex}", sensor, metric, value,
+                      report_id, measured_at, metric.minimum, metric.maximum)
     readings.append(reading)
     return reading
 
 
-def find_readings(readings: list[dict], sensor_id: str) -> list[dict]:
-    """Вернуть измерения выбранного датчика от новых к старым."""
-    return sorted(
-        (item for item in readings if item["sensor_id"] == sensor_id),
-        key=lambda item: item["measured_at"], reverse=True,
-    )
+def find_readings(readings: list[Reading], sensor_id: str) -> list[Reading]:
+    return sorted((item for item in readings if item.sensor.id == sensor_id),
+                  key=lambda item: item.measured_at, reverse=True)
 
 
-def record_report_readings(
-    readings: list[dict], sensor: dict, metrics: list[dict], report: dict,
-) -> None:
-    """Выделить измерения из отчёта, включая отчёты старого формата."""
+def record_report_readings(readings: list[Reading], sensor: Sensor,
+                           metrics: list[Metric], report: Report) -> None:
+    """Сохранить исторические нормы и ссылки на текущие объекты."""
+    report.validate()
+    if sensor.room is not report.room:
+        raise ValueError("Датчик и отчёт относятся к разным комнатам.")
     pending = []
     for metric_id in ("temperature", "humidity", "leak"):
         metric = get_metric(metrics, metric_id)
         if metric_id == "leak":
-            value = report.get("leak_detected")
-            if value is None:
+            if report.leak_detected is None:
                 continue
-            value = int(value)
+            value = int(report.leak_detected)
+            minimum, maximum = 0.0, 0.0
         else:
-            result = report.get(metric_id)
+            result = getattr(report, metric_id)
             if result is None:
                 continue
-            value = result["value"]
-            metric = {**metric, "minimum": result["minimum"],
-                      "maximum": result["maximum"]}
-        add_reading(
-            pending, sensor, metric, value, report["id"], report["checked_at"],
-        )
+            value = result.value
+            minimum, maximum = result.minimum, result.maximum
+        pending.append(Reading(f"READ-{uuid4().hex}", sensor, metric, value,
+                               report.id, report.checked_at, minimum, maximum))
     readings.extend(pending)
