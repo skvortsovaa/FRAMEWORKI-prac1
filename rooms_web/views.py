@@ -16,8 +16,76 @@ def room_list(request):
     except (OSError, ValueError):
         return data_unavailable()
 
+    query = request.GET.get("room_id", "").strip()
+    rooms = data.rooms
+    message = ""
+    message_style = "info"
+    if query:
+        rooms = []
+        try:
+            if not query.isascii() or not query.isdecimal():
+                raise ValueError
+            room_id = int(query)
+            if room_id <= 0:
+                raise ValueError
+        except ValueError:
+            message = (
+                "Введите ID помещения — положительное целое число, "
+                "например 1."
+            )
+            message_style = "warning"
+        else:
+            try:
+                rooms = [get_room(data.rooms, room_id)]
+            except ValueError:
+                message = f"Помещение с ID {escape(query)} не найдено."
+            else:
+                message = (
+                    "Помещение найдено. Нажмите на название, "
+                    "чтобы открыть карточку."
+                )
+                message_style = "success"
+
+    list_url = reverse("room_list")
+    content = f"""
+    <h1>Помещения</h1>
+    <form method="get" action="{list_url}" class="card shadow-sm mb-4"
+          role="search" aria-label="Поиск помещения по ID">
+        <div class="card-body p-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label for="room-id" class="form-label">
+                        ID помещения
+                    </label>
+                    <input type="text" inputmode="numeric" class="form-control"
+                           id="room-id" name="room_id" value="{escape(query)}"
+                           placeholder="Например, 1"
+                           aria-describedby="room-id-help">
+                </div>
+                <div class="col-12 col-md-auto d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-primary">
+                        Найти
+                    </button>
+                    <a href="{list_url}" class="btn btn-outline-secondary">
+                        Сбросить поиск
+                    </a>
+                </div>
+            </div>
+            <div id="room-id-help" class="form-text mt-2">
+                Введите положительное целое число.
+                Пустое поле покажет все помещения.
+            </div>
+        </div>
+    </form>
+    """
+    if message:
+        content += (
+            f'<div class="alert alert-{message_style}" role="status">'
+            f'{message}</div>'
+        )
+
     rows = []
-    for room in data.rooms:
+    for room in rooms:
         detail_url = reverse("room_detail", args=[room.id])
         rows.append(f"""
         <tr>
@@ -31,9 +99,9 @@ def room_list(request):
         """)
 
     if rows:
-        content = f"""
-        <h1>Помещения</h1>
-        <p class="text-secondary">Всего помещений: {len(data.rooms)}</p>
+        count_label = "Найдено помещений" if query else "Всего помещений"
+        content += f"""
+        <p class="text-secondary">{count_label}: {len(rooms)}</p>
         <div class="card shadow-sm">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0"
@@ -51,9 +119,8 @@ def room_list(request):
             </div>
         </div>
         """
-    else:
-        content = """
-        <h1>Помещения</h1>
+    elif not query:
+        content += """
         <p class="text-secondary">Помещения пока не добавлены.</p>
         """
     return HttpResponse(page("Помещения", content))

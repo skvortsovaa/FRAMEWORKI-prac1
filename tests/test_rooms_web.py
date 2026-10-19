@@ -94,6 +94,71 @@ def test_room_detail_displays_linked_sensor(web_client, saved_data):
     assert snapshot(saved_data) == before
 
 
+@pytest.mark.parametrize("query", ["12", " 12 ", "0012"])
+def test_room_search_finds_one_room(web_client, saved_data, query):
+    before = snapshot(saved_data)
+    response = web_client.get("/rooms/", {"room_id": query})
+    body = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Помещение найдено" in body
+    assert "Найдено помещений: 1" in body
+    assert "Архив №12" in body
+    assert 'href="/rooms/12/"' in body
+    assert "Серверная №7" not in body
+    assert snapshot(saved_data) == before
+
+
+def test_room_search_unknown_id(web_client, saved_data):
+    before = snapshot(saved_data)
+    response = web_client.get("/rooms/", {"room_id": "999"})
+    body = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Помещение с ID 999 не найдено" in body
+    assert "Серверная №7" not in body
+    assert "Архив №12" not in body
+    assert snapshot(saved_data) == before
+
+
+@pytest.mark.parametrize("query", [
+    "abc", "0", "-1", "1.5", "+12", "1_2", "1 2", "１２", "²",
+    '" autofocus onfocus="alert(1)', "<script>alert(1)</script>",
+    "9" * 5000,
+])
+def test_room_search_invalid_input(web_client, saved_data, query):
+    before = snapshot(saved_data)
+    response = web_client.get("/rooms/", {"room_id": query})
+    body = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Введите ID помещения — положительное целое число" in body
+    assert f'value="{escape(query)}"' in body
+    assert "<script>alert(1)</script>" not in body
+    assert "Серверная №7" not in body
+    assert "Архив №12" not in body
+    assert snapshot(saved_data) == before
+
+
+@pytest.mark.parametrize("query", ["", "   "])
+def test_room_search_empty_and_reset_show_full_list(
+        web_client, saved_data, query):
+    before = snapshot(saved_data)
+    for params in ({"room_id": query}, {}):
+        response = web_client.get("/rooms/", params)
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Всего помещений: 2" in body
+        assert "Серверная №7" in body
+        assert "Архив №12" in body
+        assert 'method="get" action="/rooms/"' in body
+        assert 'name="room_id" value=""' in body
+        assert 'href="/rooms/" class="btn btn-outline-secondary"' in body
+        assert "Сбросить поиск" in body
+    assert snapshot(saved_data) == before
+
+
 @pytest.mark.parametrize("active,battery,status", [
     (True, 100, "Доступен"),
     (False, 100, "Недоступен"),
