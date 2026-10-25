@@ -12,6 +12,12 @@
                            id="room-id" name="room_id" value="{{ query }}"
                            placeholder="Например, 1" aria-describedby="room-id-help">
                 </div>
+                {% if sql_data %}
+                    <div class="col-12 col-md-3">
+                        <label for="min-area" class="form-label">Площадь от м²</label>
+                        <input id="min-area" name="min_area" value="{{ min_area }}" type="number" min="0" step="any" class="form-control">
+                    </div>
+                {% endif %}
                 <div class="col-12 col-md-auto d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn btn-primary">Найти</button>
                     <a href="{% url 'rooms:list' %}" class="btn btn-outline-secondary">Сбросить поиск</a>
@@ -25,14 +31,14 @@
     {% if message %}
         <div class="alert alert-{{ message_style }}" role="status">{{ message }}</div>
     {% endif %}
-    <p class="text-secondary">{% if query %}Найдено помещений{% else %}Всего помещений{% endif %}: {{ rooms|length }}</p>
+    <p class="text-secondary">{% if query or min_area %}Найдено помещений{% else %}Всего помещений{% endif %}: {{ rooms|length }}</p>
     <div class="row g-4">
         {% for room in rooms %}
             <div class="col-12 col-md-6">
                 {% include "rooms_web/includes/room_card.html" with room=room only %}
             </div>
         {% empty %}
-            <p class="text-secondary">{% if query %}По вашему запросу помещения не найдены.{% else %}Помещения пока не добавлены.{% endif %}</p>
+            <p class="text-secondary">{% if query or min_area %}По вашему запросу помещения не найдены.{% else %}Помещения пока не добавлены.{% endif %}</p>
         {% endfor %}
     </div>
 {% endblock %}

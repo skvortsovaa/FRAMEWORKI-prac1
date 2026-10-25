@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Статистика | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <h1>Статистика мониторинга</h1>
+    <div class="row g-3 mb-4">
+        <p class="col-md-3">Помещений: <strong>{{ rooms_total.total }}</strong></p>
+        <p class="col-md-3">Всего проверок: <strong>{{ totals.total }}</strong></p>
+        <p class="col-md-3">Аварий: <strong>{{ totals.alarms }}</strong></p>
+        <p class="col-md-3">Без данных: <strong>{{ totals.no_data }}</strong></p>
+    </div>
+    <h2 class="h4">Проверки по помещениям</h2>
+    <div class="table-responsive mb-4">
+        <table class="table table-striped"><thead><tr><th>Помещение</th><th>Проверок</th></tr></thead>
+            <tbody>{% for item in statistics %}<tr><td><a href="{% url 'rooms:detail' item.id %}">{{ item.room_name }}</a></td><td>{{ item.reports_count }}</td></tr>{% empty %}<tr><td colspan="2">Помещений нет.</td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    <h2 class="h4">Проверки по статусам</h2>
+    <ul>{% for item in statuses %}<li>{{ item.status }}: {{ item.reports_count }}</li>{% empty %}<li>Проверок пока нет.</li>{% endfor %}</ul>
+    <h2 class="h4">Помещения с количеством проверок выше порога</h2>
+    <form method="get" class="d-flex flex-wrap gap-3 align-items-end mb-3">
+        <div><label for="min-count" class="form-label">Количество строго больше</label><input class="form-control" id="min-count" name="min_count" type="number" min="0" value="{{ threshold }}"></div>
+        <button type="submit" class="btn btn-primary">Применить порог</button>
+    </form>
+    {% if message %}<p class="alert alert-warning">{{ message }}</p>{% endif %}
+    <ul>{% for item in filtered %}<li>{{ item.room_name }}: {{ item.reports_count }}</li>{% empty %}<li>По заданному порогу помещений нет.</li>{% endfor %}</ul>
+    <h2 class="h4">Измерения по показателям</h2>
+    <div class="table-responsive">
+        <table class="table table-striped"><thead><tr><th>Показатель</th><th>Измерений</th><th>Минимум</th><th>Максимум</th><th>Среднее</th></tr></thead>
+            <tbody>{% for item in metrics %}<tr><td>{{ item.metric_name }} ({{ item.unit }})</td><td>{{ item.readings_count }}</td><td>{{ item.minimum_value|default_if_none:"Нет данных" }}</td><td>{{ item.maximum_value|default_if_none:"Нет данных" }}</td><td>{{ item.average_value|default_if_none:"Нет данных" }}</td></tr>{% empty %}<tr><td colspan="5">Показателей нет.</td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+{% endblock %}

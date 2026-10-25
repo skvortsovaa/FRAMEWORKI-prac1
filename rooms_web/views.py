@@ -1,6 +1,9 @@
 """Подготовка объектов помещений для шаблонов без записи в JSON."""
 
+from django.conf import settings
 from django.shortcuts import render
+
+from . import sql_views
 
 from homepage.views import data_unavailable
 from models.rooms import get_room
@@ -10,6 +13,8 @@ from smartspace_web.data import load_project_data
 
 def room_list(request):
     """Список помещений с прежним поиском по положительному ID."""
+    if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
+        return sql_views.room_list(request)
     try:
         data = load_project_data()
     except (OSError, ValueError):
@@ -56,6 +61,8 @@ def room_list(request):
 
 def room_detail(request, room_id):
     """Объект или None передаётся в шаблон; HTTP-статус выбирает view."""
+    if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
+        return sql_views.room_detail(request, room_id)
     try:
         data = load_project_data()
     except (OSError, ValueError):

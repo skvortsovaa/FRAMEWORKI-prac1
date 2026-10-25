@@ -17,7 +17,8 @@ from storage import COLLECTIONS, JOURNAL, empty_data, save_data
 def web_client(tmp_path):
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "smartspace_web.settings")
     django.setup()
-    with override_settings(BASE_DIR=tmp_path, ALLOWED_HOSTS=["testserver"],
+    with override_settings(SMARTSPACE_DATA_SOURCE="json",
+                           BASE_DIR=tmp_path, ALLOWED_HOSTS=["testserver"],
                            DEBUG=True):
         yield Client()
 

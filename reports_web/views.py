@@ -1,6 +1,9 @@
 """Исторические отчёты: только загрузка, поиск и передача контекста."""
 
+from django.conf import settings
 from django.shortcuts import render
+
+from . import sql_views
 
 from homepage.views import data_unavailable
 from smartspace_web.data import load_project_data
@@ -8,6 +11,8 @@ from smartspace_web.data import load_project_data
 
 def report_list(request):
     """Сохранённый порядок и снимки Report остаются неизменными."""
+    if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
+        return sql_views.report_list(request)
     try:
         data = load_project_data()
     except (OSError, ValueError):
@@ -18,6 +23,8 @@ def report_list(request):
 
 def report_detail(request, report_id):
     """Неизвестный строковый ID даёт шаблон с сообщением и статус 404."""
+    if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
+        return sql_views.report_detail(request, report_id)
     try:
         data = load_project_data()
     except (OSError, ValueError):

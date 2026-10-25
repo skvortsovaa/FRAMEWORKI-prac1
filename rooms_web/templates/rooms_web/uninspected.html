@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Помещения без проверки | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <h1>Помещения без проверки</h1>
+    <p class="text-secondary">Найдите помещения, для которых нет отчёта на выбранную дату.</p>
+    <form method="get" class="card card-body mb-4">
+        <label for="date" class="form-label">Дата</label>
+        <input type="date" id="date" name="date" value="{{ selected_date }}" required class="form-control mb-3">
+        <button type="submit" class="btn btn-primary align-self-start">Найти</button>
+    </form>
+    {% if message %}
+        <p class="alert alert-warning">{{ message }}</p>
+    {% elif selected_date %}
+        <h2 class="h4">Без проверки на {{ selected_date }}: {{ rooms|length }}</h2>
+        <div class="row g-4">
+            {% for room in rooms %}
+                <div class="col-12 col-md-6">{% include "rooms_web/includes/room_card.html" with room=room only %}</div>
+            {% empty %}
+                <p>На выбранную дату все помещения проверены либо список помещений пуст.</p>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Выберите дату для поиска.</p>
+    {% endif %}
+{% endblock %}

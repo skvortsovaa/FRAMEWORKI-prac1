@@ -32,7 +32,158 @@
    * Конкретное измерение, полученное от датчика в определенный момент времени.
    * *Атрибуты:* временная метка (timestamp), числовое значение, статус (в норме / предупреждение / критично), привязка к датчику и показателю.
 
-## ПР6: веб-интерфейс на шаблонах Django
+## ПР7 текущая версия SQLite и SQL
+
+Веб-интерфейс по умолчанию получает данные из `data/smartspace.sqlite`
+через стандартный `sqlite3`, без Django ORM. Служебная база Django
+`db.sqlite3` остаётся отдельной. Исходные JSON, консольная версия и
+классы ПР3 сохранены. Режим JSON ПР6 доступен явно через
+`SMARTSPACE_DATA_SOURCE = "json"` в настройках; автоматического возврата
+к JSON при ошибке SQLite нет. Регрессионные тесты ПР6 явно выбирают JSON,
+а `tests/test_sqlite.py` проверяет основной SQL-режим.
+
+### Запуск
+
+Из папки `FRAMEWORKI-prac1` в PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m db.database
+.\.venv\Scripts\python.exe -m db.import_json
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py runserver --insecure
+```
+
+База включена в репозиторий как результат ПР7. Первые две команды позволяют
+создать её после удаления или клонирования без готового файла. Повторная
+схема не удаляет таблицы (`IF NOT EXISTS`). Импорт сначала проверяет весь
+набор JSON кодом ПР3, затем переносит данные в одной транзакции: rooms,
+sensors, metrics, reports, readings. Повторный импорт одинаковых данных
+не создаёт дубликатов. Если SQLite уже изменена, импорт отказывается
+перезаписывать её без явного `--replace`. При ошибке — `rollback()`.
+Чтение сайта открывает базу в режиме `mode=ro` и не создаёт отсутствующий
+файл. Все соединения включают `foreign_keys=ON`, используют `sqlite3.Row`
+и закрываются после работы. Тексты запросов хранятся в `sql/queries.sql`,
+и сайт выполняет именно их через `execute_query`, без копий в views.
+
+### Таблицы и связи
+
+| Таблица | Поля и типы |
+| --- | --- |
+| rooms | id INTEGER PK; name TEXT; floor INTEGER; area REAL |
+| sensors | id TEXT PK; room_id INTEGER FK UNIQUE; active INTEGER 0/1; battery INTEGER 0–100 |
+| metrics | id TEXT PK; name, unit TEXT; minimum, maximum REAL |
+| reports | id TEXT PK; room_id INTEGER FK; room_name, checked_at, status TEXT; sensor_active, battery INTEGER; исторические temperature/humidity value/minimum/maximum REAL и normal INTEGER; leak_detected INTEGER или NULL |
+| readings | id TEXT PK; sensor_id, metric_id, report_id TEXT FK; measured_at, status TEXT; value, minimum, maximum REAL; UNIQUE(report_id, metric_id) |
+
+`sensors.room_id → rooms.id`, `reports.room_id → rooms.id`,
+`readings.sensor_id → sensors.id`, `readings.metric_id → metrics.id`,
+`readings.report_id → reports.id`. На помещение приходится один датчик
+и много отчётов; у отчёта до трёх измерений. Полная схема и ограничения
+`PRIMARY KEY`, `FOREIGN KEY`, `NOT NULL`, `CHECK`, `DEFAULT`, `UNIQUE`
+находятся в `sql/schema.sql`. Снимки старых названий и норм хранятся
+независимо от текущих справочников. `NULL` означает отсутствие показаний,
+а 0 для протечки — сохранённое значение «не обнаружена».
+
+### Пользовательские сценарии
+
+| Адрес | Назначение |
+| --- | --- |
+| `/rooms/` | Список, поиск по ID и минимальной площади `?room_id=1&min_area=20` |
+| `/rooms/1/` | Помещение и связанный датчик из SQLite |
+| `/sensors/` | JOIN датчиков и помещений; `?available=1` — только доступные |
+| `/reports/` | JOIN истории и текущих помещений; фильтры `?date=2026-09-21&status=ПРЕДУПРЕЖДЕНИЕ` |
+| `/reports/<id>/` | Исторический снимок с сохранёнными нормами |
+| `/rooms/uninspected/` | Поиск помещений без отчёта за выбранную дату через NOT EXISTS |
+| `/reports/statistics/` | COUNT, SUM, LEFT JOIN, GROUP BY, HAVING, MIN, MAX, AVG; порог `?min_count=0` |
+| `/reports/readings/` | JOIN четырёх таблиц, справочник показателей; LIMIT/OFFSET через `?limit=2&offset=1` |
+
+Сценарий Roomly «свободные помещения по дате» адаптирован к мониторингу:
+«помещения без проверки на дату». Бронирования и пользователи не добавлялись.
+Даты принимаются в формате YYYY-MM-DD, числовые параметры проверяются,
+в SQL значения передаются отдельно через `?`. Пустые результаты выводятся
+через `empty`. Отсутствующий объект возвращает 404; повреждённая или
+отсутствующая SQLite — общую страницу 503 без подробностей ошибки.
+
+### Каталог 19 запросов и их использование на сайте
+
+| Имя запроса | Назначение и страница |
+| --- | --- |
+| `rooms_list` | 01 SELECT список помещений — /rooms/ |
+| `metrics_list` | 02 SELECT справочник показателей — /readings/ |
+| `rooms_by_area` | 03 WHERE площадь не меньше порога — /rooms/?min_area=30 |
+| `available_sensors` | 04 WHERE доступные датчики — /sensors/?available=1 |
+| `sensors_with_rooms` | 05 JOIN датчики с помещениями — /sensors/ |
+| `reports_with_rooms` | 06 JOIN история и текущие помещения — /reports/ |
+| `reports_filtered` | 07 WHERE дата и статус — /reports/?date=2026-09-21&status=ПРЕДУПРЕЖДЕНИЕ |
+| `rooms_without_reports` | 08 NOT EXISTS помещения без проверок на дату — /rooms/uninspected/ |
+| `room_count` | 09 COUNT число помещений — /reports/statistics/ |
+| `report_totals` | 10 агрегаты истории — /reports/statistics/ |
+| `room_report_counts` | 11 GROUP BY включая нулевые группы — /reports/statistics/ |
+| `status_counts` | 12 GROUP BY по статусам — /reports/statistics/ |
+| `rooms_above_count` | 13 HAVING групповой порог — /reports/statistics/?min_count=0 |
+| `readings_list` | 14 JOIN ORDER BY LIMIT OFFSET — /readings/?limit=10&offset=0 |
+| `room_by_id` | 15 параметризованный ID — /rooms/<id>/ |
+| `sensor_by_room` | 16 связанный датчик — /rooms/<id>/ |
+| `report_by_id` | 17 снимок отчёта — /reports/<id>/ |
+| `room_search` | 18 поиск ID и площади — /rooms/?room_id=1&min_area=20 |
+| `metric_statistics` | 19 MIN MAX AVG GROUP BY — /reports/statistics/ |
+
+Минимум методички соблюдён: два списка (01–02), два фильтра (03–04),
+два JOIN (05–06), два агрегатных запроса (09–10), две группировки
+(11–12). Дополнительно есть HAVING (13), LIMIT/OFFSET (14), поиск ID,
+связанные карточки и агрегаты измерений. Все 19 запросов используются
+в шаблонных страницах. Представления ПР7 находятся в `sql_views.py`
+приложений; прежние `views.py` выбирают SQL или сохранённый JSON-режим.
+
+### Проверка SQL в терминале
+
+```powershell
+.\.venv\Scripts\python.exe -m db.cli --list
+.\.venv\Scripts\python.exe -m db.cli --query rooms_by_area --params '[30]'
+.\.venv\Scripts\python.exe -m db.cli --sql "PRAGMA database_list"
+.\.venv\Scripts\python.exe -m sqlite3 data/smartspace.sqlite "SELECT COUNT(*) FROM rooms;"
+```
+
+Для прямых SQL-команд доступна штатная оболочка Python 3.14:
+`python -m sqlite3 data/smartspace.sqlite`. Функции `db.cli` позволяют
+выполнять те же именованные запросы с параметрами, что использует сайт.
+`db.cli` открывает базу только для чтения.
+
+### Демонстрация на отдельной копии
+
+```powershell
+.\.venv\Scripts\python.exe -m db.demo reset
+$env:SMARTSPACE_DB_PATH = (Resolve-Path .demo/smartspace.sqlite).Path
+.\.venv\Scripts\python.exe manage.py runserver 8007 --insecure
+```
+
+`db.demo rename` меняет название помещения №1 только в копии,
+`db.demo disable` выключает датчик помещения №2 только в копии.
+`db.demo reset` восстанавливает копию из основной SQLite. Для окончания
+демонстрации остановить сервер и выполнить
+`Remove-Item Env:SMARTSPACE_DB_PATH -ErrorAction SilentlyContinue`.
+Папка `.demo/` исключена из Git. Исходные JSON и основная база не меняются.
+
+### Проверки ПР7
+
+```powershell
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe -m pytest -v
+.\.venv\Scripts\python.exe -m flake8 .
+git diff --check
+```
+
+Сохранены 177 тестов ПР3–ПР6 и добавлены проверки SQLite: импорт и
+повторный запуск, FK/UNIQUE/CHECK, откат всей транзакции, независимость
+сайта от JSON, живые изменения SQLite, фильтры, LEFT JOIN и нулевые
+агрегаты, снимки и NULL, пагинация, неверные параметры, ответы 404/503.
+Коммиты этапа имеют префикс `PR7:`. Исходное состояние ПР6 — `d322d9b`.
+
+## ПР6 предыдущая реализация JSON
+
+Следующее описание сохраняет устройство прежнего этапа; текущая веб-версия
+и основной источник данных описаны в разделе ПР7 выше.
+
 
 К консольной версии добавлены проект `smartspace_web` и четыре приложения:
 `homepage`, `rooms_web`, `sensors_web`, `reports_web`.

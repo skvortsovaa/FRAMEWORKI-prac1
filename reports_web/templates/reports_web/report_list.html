@@ -2,11 +2,33 @@
 {% block title %}История проверок | SmartSpace Monitor{% endblock %}
 {% block content %}
     <h1>История проверок</h1>
+    {% if sql_data %}
+        <form method="get" class="card card-body mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="date">Дата проверки</label>
+                    <input class="form-control" type="date" id="date" name="date" value="{{ selected_date }}">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="status">Статус</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">Все статусы</option>
+                        {% for status in statuses %}<option value="{{ status }}" {% if status == selected_status %}selected{% endif %}>{{ status }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-4 d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">Найти</button>
+                    <a href="{% url 'reports:list' %}" class="btn btn-outline-secondary">Сбросить</a>
+                </div>
+            </div>
+        </form>
+        {% if message %}<p class="alert alert-warning">{{ message }}</p>{% endif %}
+    {% endif %}
     <p class="text-secondary">Всего проверок: {{ reports|length }}</p>
     <div class="card shadow-sm table-responsive">
         <table class="table table-hover align-middle mb-0" aria-label="История проверок">
             <thead class="table-light">
-                <tr><th scope="col">Дата и время проверки</th><th scope="col">Помещение при проверке</th><th scope="col">Статус</th></tr>
+                <tr><th scope="col">Дата и время проверки</th><th scope="col">Помещение при проверке</th><th scope="col">Статус</th>{% if sql_data %}<th scope="col">Текущее помещение</th>{% endif %}</tr>
             </thead>
             <tbody>
                 {% for report in reports %}
@@ -14,9 +36,10 @@
                         <th scope="row"><a href="{% url 'reports:detail' report.id %}">{{ report.checked_at|slice:":10" }} {{ report.checked_at|slice:"11:" }}</a></th>
                         <td>{{ report.room_name|default:"Без названия" }}</td>
                         <td>{% include "reports_web/includes/report_status.html" with status=report.status only %}</td>
+                        {% if sql_data %}<td><a href="{% url 'rooms:detail' report.room_id %}">{{ report.current_room_name }}</a></td>{% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="3" class="text-secondary">Проверок пока нет.</td></tr>
+                    <tr><td colspan="4" class="text-secondary">{% if selected_date or selected_status %}По выбранным условиям проверки не найдены.{% else %}Проверок пока нет.{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

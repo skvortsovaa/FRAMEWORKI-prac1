@@ -10,6 +10,9 @@
             <a class="nav-link" href="{% url 'rooms:list' %}"{% if request.resolver_match.namespace == 'rooms' %} aria-current="page"{% endif %}>Помещения</a>
             <a class="nav-link" href="{% url 'sensors:list' %}"{% if request.resolver_match.namespace == 'sensors' %} aria-current="page"{% endif %}>Датчики</a>
             <a class="nav-link" href="{% url 'reports:list' %}"{% if request.resolver_match.namespace == 'reports' %} aria-current="page"{% endif %}>История проверок</a>
+            <a class="nav-link" href="{% url 'rooms:uninspected' %}">Без проверки</a>
+            <a class="nav-link" href="{% url 'reports:statistics' %}">Статистика</a>
+            <a class="nav-link" href="{% url 'reports:readings' %}">Измерения</a>
         </nav>
     </div>
 </header>

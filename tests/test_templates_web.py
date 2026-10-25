@@ -27,7 +27,8 @@ def template_client(tmp_path):
     save_data(tmp_path / "data", data)
     setup_test_environment()
     try:
-        with override_settings(BASE_DIR=tmp_path,
+        with override_settings(SMARTSPACE_DATA_SOURCE="json",
+                               BASE_DIR=tmp_path,
                                ALLOWED_HOSTS=["testserver"], DEBUG=False):
             yield Client()
     finally:

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Измерения | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <h1>Измерения</h1>
+    <form method="get" class="row g-3 mb-4 align-items-end">
+        <div class="col-md-4"><label for="limit" class="form-label">Записей на странице</label><input class="form-control" type="number" id="limit" name="limit" min="1" max="100" value="{{ limit }}"></div>
+        <div class="col-md-4"><label for="offset" class="form-label">Пропустить записей</label><input class="form-control" type="number" id="offset" name="offset" min="0" value="{{ offset }}"></div>
+        <div class="col-md-4"><button type="submit" class="btn btn-primary">Показать</button></div>
+    </form>
+    {% if message %}<p class="alert alert-warning">{{ message }}</p>{% endif %}
+    <div class="table-responsive mb-4">
+        <table class="table table-striped"><thead><tr><th>Дата</th><th>Помещение</th><th>Датчик</th><th>Показатель</th><th>Значение</th><th>Норма при проверке</th><th>Статус</th></tr></thead>
+            <tbody>{% for item in readings %}<tr><td><a href="{% url 'reports:detail' item.report_id %}">{{ item.measured_at|slice:":10" }} {{ item.measured_at|slice:"11:" }}</a></td><td>{{ item.room_name }}</td><td>{{ item.sensor_id }}</td><td>{{ item.metric_name }}</td><td>{{ item.value|floatformat:"-2" }} {{ item.unit }}</td><td>{{ item.minimum|floatformat:"-2" }}–{{ item.maximum|floatformat:"-2" }} {{ item.unit }}</td><td>{% include "reports_web/includes/report_status.html" with status=item.status only %}</td></tr>{% empty %}<tr><td colspan="7">Измерения не найдены.</td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    <h2 class="h4">Справочник показателей</h2>
+    <ul>{% for metric in metrics %}<li>{{ metric.name }}: {{ metric.minimum }}–{{ metric.maximum }} {{ metric.unit }}</li>{% empty %}<li>Показателей нет.</li>{% endfor %}</ul>
+{% endblock %}

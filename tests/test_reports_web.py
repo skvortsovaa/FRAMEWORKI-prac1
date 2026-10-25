@@ -34,7 +34,8 @@ def report_project(tmp_path):
     data.metrics[0].update_limits(100, 200)
     directory = tmp_path / "data"
     save_data(directory, data)
-    with override_settings(BASE_DIR=tmp_path, ALLOWED_HOSTS=["testserver"],
+    with override_settings(SMARTSPACE_DATA_SOURCE="json",
+                           BASE_DIR=tmp_path, ALLOWED_HOSTS=["testserver"],
                            DEBUG=True):
         yield Client(), data, directory
 
