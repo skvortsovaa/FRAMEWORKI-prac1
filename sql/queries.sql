@@ -3,7 +3,7 @@
 SELECT id, name, floor, area FROM rooms ORDER BY id;
 
 -- name: metrics_list
--- 02 SELECT справочник показателей — /readings/
+-- 02 SELECT справочник показателей — /reports/readings/
 SELECT id, name, unit, minimum, maximum FROM metrics ORDER BY id;
 
 -- name: rooms_by_area
@@ -75,7 +75,7 @@ GROUP BY r.id, r.name HAVING COUNT(p.id) > ?
 ORDER BY reports_count DESC, r.id;
 
 -- name: readings_list
--- 14 JOIN ORDER BY LIMIT OFFSET — /readings/?limit=10&offset=0
+-- 14 JOIN ORDER BY LIMIT OFFSET — /reports/readings/?limit=10&offset=0
 SELECT v.id, v.report_id, v.measured_at, v.value, v.minimum,
        v.maximum, v.status, s.id AS sensor_id, r.name AS room_name,
        m.name AS metric_name, m.unit

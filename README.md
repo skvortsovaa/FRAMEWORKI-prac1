@@ -109,7 +109,7 @@ sensors, metrics, reports, readings. Повторный импорт одина�
 | Имя запроса | Назначение и страница |
 | --- | --- |
 | `rooms_list` | 01 SELECT список помещений — /rooms/ |
-| `metrics_list` | 02 SELECT справочник показателей — /readings/ |
+| `metrics_list` | 02 SELECT справочник показателей — /reports/readings/ |
 | `rooms_by_area` | 03 WHERE площадь не меньше порога — /rooms/?min_area=30 |
 | `available_sensors` | 04 WHERE доступные датчики — /sensors/?available=1 |
 | `sensors_with_rooms` | 05 JOIN датчики с помещениями — /sensors/ |
@@ -121,7 +121,7 @@ sensors, metrics, reports, readings. Повторный импорт одина�
 | `room_report_counts` | 11 GROUP BY включая нулевые группы — /reports/statistics/ |
 | `status_counts` | 12 GROUP BY по статусам — /reports/statistics/ |
 | `rooms_above_count` | 13 HAVING групповой порог — /reports/statistics/?min_count=0 |
-| `readings_list` | 14 JOIN ORDER BY LIMIT OFFSET — /readings/?limit=10&offset=0 |
+| `readings_list` | 14 JOIN ORDER BY LIMIT OFFSET — /reports/readings/?limit=10&offset=0 |
 | `room_by_id` | 15 параметризованный ID — /rooms/<id>/ |
 | `sensor_by_room` | 16 связанный датчик — /rooms/<id>/ |
 | `report_by_id` | 17 снимок отчёта — /reports/<id>/ |
