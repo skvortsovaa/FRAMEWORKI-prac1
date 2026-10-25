@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Датчики | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <h1>Датчики</h1>
+    <p class="text-secondary">Всего датчиков: {{ sensors|length }}</p>
+    <div class="card shadow-sm table-responsive">
+        <table class="table table-hover align-middle mb-0" aria-label="Список датчиков">
+            <thead class="table-light">
+                <tr><th scope="col">ID датчика</th><th scope="col">Помещение</th><th scope="col">Активность</th><th scope="col">Заряд</th><th scope="col">Доступность</th></tr>
+            </thead>
+            <tbody>
+                {% for sensor in sensors %}
+                    <tr>
+                        <th scope="row">{{ sensor.id }}</th>
+                        <td><a href="{% url 'rooms:detail' sensor.room.id %}">{{ sensor.room.name|default:"Без названия" }}</a></td>
+                        <td>{{ sensor.active|yesno:"Включён,Отключён" }}</td>
+                        <td>{{ sensor.battery }}%{% if sensor.battery < 20 %}<div class="small text-warning-emphasis">Низкий заряд: рекомендуется обслуживание.</div>{% endif %}</td>
+                        <td>{% include "sensors_web/includes/availability.html" with available=sensor.is_available only %}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-secondary">Датчики пока не добавлены.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-secondary mt-3">Датчик доступен, если он включён и заряд больше нуля.</p>
+{% endblock %}

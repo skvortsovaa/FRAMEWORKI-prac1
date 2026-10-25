@@ -1,0 +1,18 @@
+body { background: #f4f7fb; color: #172b4d; }
+.site-header { background: #172b4d; }
+.site-header a { color: #fff; }
+.site-header a:hover { color: #b9dcff; }
+.site-header a:focus-visible { outline: 2px solid #b9dcff; outline-offset: 3px; }
+.site-header [aria-current="page"] { text-decoration: underline; text-underline-offset: 6px; }
+.site-brand { display: inline-flex; align-items: center; gap: 12px; }
+.site-brand img { flex-shrink: 0; }
+.section-card, .room-card { border-top: 4px solid #0d6efd; }
+.room-card { border-radius: 14px; }
+.report-status, .sensor-status { letter-spacing: 0.03em; padding: 0.5em 0.75em; }
+.card-title, h1, dd { overflow-wrap: anywhere; }
+.table { --bs-table-bg: transparent; }
+@media (max-width: 575px) {
+    .site-brand { font-size: 1.15rem !important; }
+    .nav { gap: 4px 12px; }
+    .nav-link { padding-left: 0; padding-right: 0; }
+}

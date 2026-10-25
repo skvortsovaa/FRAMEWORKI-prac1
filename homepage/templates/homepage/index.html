@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Главная | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <h1 class="display-5 fw-semibold">SmartSpace Monitor</h1>
+    <p class="lead">Система мониторинга состояния помещений</p>
+    <p class="text-secondary mb-4">
+        Температура, влажность и протечки: информация о помещениях,
+        состоянии датчиков и результатах проверок в одном месте.
+    </p>
+    <div class="row g-4">
+        <section class="col-12 col-md-4">
+            <div class="card section-card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column p-4">
+                    <h2 class="h4 card-title">Помещения</h2>
+                    <p class="card-text">Название, этаж и площадь каждого помещения.</p>
+                    <a href="{% url 'rooms:list' %}" class="btn btn-primary mt-auto">К помещениям</a>
+                </div>
+            </div>
+        </section>
+        <section class="col-12 col-md-4">
+            <div class="card section-card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column p-4">
+                    <h2 class="h4 card-title">Датчики</h2>
+                    <p class="card-text">Устройства, их активность и уровень заряда.</p>
+                    <a href="{% url 'sensors:list' %}" class="btn btn-primary mt-auto">К датчикам</a>
+                </div>
+            </div>
+        </section>
+        <section class="col-12 col-md-4">
+            <div class="card section-card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column p-4">
+                    <h2 class="h4 card-title">История проверок</h2>
+                    <p class="card-text">Результаты мониторинга и состояние микроклимата.</p>
+                    <a href="{% url 'reports:list' %}" class="btn btn-primary mt-auto">К истории проверок</a>
+                </div>
+            </div>
+        </section>
+    </div>
+{% endblock %}

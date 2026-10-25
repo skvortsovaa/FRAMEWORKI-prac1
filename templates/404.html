@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}404 — страница не найдена | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <section class="card shadow-sm">
+        <div class="card-body p-4 p-md-5">
+            <h1 class="text-danger">404 — страница не найдена</h1>
+            <p class="lead">Проверьте адрес или вернитесь на главную.</p>
+            <a href="{% url 'homepage:index' %}" class="btn btn-primary">На главную</a>
+        </div>
+    </section>
+{% endblock %}

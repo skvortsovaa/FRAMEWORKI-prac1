@@ -94,7 +94,7 @@ def test_report_names_and_ids_are_escaped(report_project):
     report.id = '<img src=x onerror="alert(1)">'
     report.room_name = '<script>alert("room")</script> & старое имя'
     save_data(directory, data)
-    url = reverse("report_detail", args=[report.id])
+    url = reverse("reports:detail", args=[report.id])
     listing = client.get("/reports/").content.decode()
     assert escape(url) in listing
     response = client.get(url)

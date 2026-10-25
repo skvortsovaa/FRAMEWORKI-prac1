@@ -1,0 +1,15 @@
+{% load static %}
+<header class="site-header py-3">
+    <div class="container">
+        <a class="site-brand fs-4 fw-semibold text-decoration-none" href="{% url 'homepage:index' %}">
+            <img src="{% static 'homepage/img/logo.svg' %}" width="40" height="40" alt="Логотип SmartSpace Monitor">
+            SmartSpace Monitor
+        </a>
+        <nav class="nav mt-2" aria-label="Основная навигация">
+            <a class="nav-link ps-0" href="{% url 'homepage:index' %}"{% if request.resolver_match.namespace == 'homepage' %} aria-current="page"{% endif %}>Главная</a>
+            <a class="nav-link" href="{% url 'rooms:list' %}"{% if request.resolver_match.namespace == 'rooms' %} aria-current="page"{% endif %}>Помещения</a>
+            <a class="nav-link" href="{% url 'sensors:list' %}"{% if request.resolver_match.namespace == 'sensors' %} aria-current="page"{% endif %}>Датчики</a>
+            <a class="nav-link" href="{% url 'reports:list' %}"{% if request.resolver_match.namespace == 'reports' %} aria-current="page"{% endif %}>История проверок</a>
+        </nav>
+    </div>
+</header>

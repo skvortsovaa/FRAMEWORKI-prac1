@@ -1,0 +1,9 @@
+{% if status == "НОРМА" %}
+    <span class="badge text-bg-success report-status">{{ status }}</span>
+{% elif status == "ПРЕДУПРЕЖДЕНИЕ" %}
+    <span class="badge text-bg-warning report-status">{{ status }}</span>
+{% elif status == "АВАРИЯ" %}
+    <span class="badge text-bg-danger report-status">{{ status }}</span>
+{% else %}
+    <span class="badge text-bg-secondary report-status">{{ status|default:"НЕТ ДАННЫХ" }}</span>
+{% endif %}

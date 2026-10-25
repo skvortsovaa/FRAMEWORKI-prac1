@@ -1,0 +1,8 @@
+<article class="card room-card h-100 shadow-sm">
+    <div class="card-body p-4">
+        <p class="small text-secondary">Помещение №{{ room.id }}</p>
+        <h2 class="h4 card-title"><a href="{% url 'rooms:detail' room.id %}">{{ room.name|default:"Без названия" }}</a></h2>
+        <p>Этаж: {{ room.floor }} · Площадь: {{ room.area|floatformat:"-2" }} м²</p>
+        <a href="{% url 'rooms:detail' room.id %}" class="btn btn-outline-primary">Подробнее</a>
+    </div>
+</article>

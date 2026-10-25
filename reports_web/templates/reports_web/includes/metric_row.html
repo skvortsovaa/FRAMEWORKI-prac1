@@ -1,0 +1,10 @@
+<tr>
+    <th scope="row">{{ label }}</th>
+    {% if analysis %}
+        <td>{{ analysis.value|stringformat:"g" }} {{ unit }}</td>
+        <td>{{ analysis.minimum|stringformat:"g" }}–{{ analysis.maximum|stringformat:"g" }} {{ unit }}</td>
+        <td>{{ analysis.normal|yesno:"В норме,Вне нормы" }}</td>
+    {% else %}
+        <td>Нет данных</td><td>—</td><td>Нет данных</td>
+    {% endif %}
+</tr>

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{% if report %}Отчёт {{ report.id }}{% else %}Отчёт не найден{% endif %} | SmartSpace Monitor{% endblock %}
+{% block content %}
+    {% if report %}
+        <h1>Отчёт проверки</h1>
+        <p class="text-secondary text-break">ID: {{ report.id }}</p>
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h2 class="h4">{{ report.room_name|default:"Без названия" }}</h2>
+                <p>{{ report.checked_at|slice:":10" }} {{ report.checked_at|slice:"11:" }} · {% include "reports_web/includes/report_status.html" with status=report.status only %}</p>
+                <p class="text-secondary">Название, состояние датчика и нормы сохранены на момент проверки.</p>
+                <p>Датчик при проверке: <strong>{{ report.sensor_active|yesno:"Включён,Отключён" }}</strong>.
+                    Заряд: <strong>{{ report.battery }}%</strong>.</p>
+                <p>Протечка: <strong>{{ report.leak_detected|yesno:"Обнаружена,Не обнаружена,Нет данных" }}</strong>.</p>
+                <a href="{% url 'rooms:detail' report.room.id %}">Открыть текущее помещение</a>
+            </div>
+        </div>
+        <h2 class="h4">Сохранённые показания</h2>
+        <div class="card shadow-sm mb-4 table-responsive">
+            <table class="table align-middle mb-0" aria-label="Показания на момент проверки">
+                <thead class="table-light">
+                    <tr><th scope="col">Показатель</th><th scope="col">Значение</th><th scope="col">Норма при проверке</th><th scope="col">Результат</th></tr>
+                </thead>
+                <tbody>
+                    {% include "reports_web/includes/metric_row.html" with label="Температура" analysis=report.temperature unit="°C" only %}
+                    {% include "reports_web/includes/metric_row.html" with label="Влажность" analysis=report.humidity unit="%" only %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <h1 class="text-danger">Отчёт не найден</h1>
+        <p>В истории нет отчёта с указанным идентификатором.</p>
+    {% endif %}
+    <a href="{% url 'reports:list' %}" class="btn btn-outline-primary">К истории проверок</a>
+{% endblock %}

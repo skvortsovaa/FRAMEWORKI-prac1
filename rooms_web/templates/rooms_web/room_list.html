@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Помещения | SmartSpace Monitor{% endblock %}
+{% block content %}
+    <h1>Помещения</h1>
+    <form method="get" action="{% url 'rooms:list' %}" class="card shadow-sm mb-4"
+          role="search" aria-label="Поиск помещения по ID">
+        <div class="card-body p-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label for="room-id" class="form-label">ID помещения</label>
+                    <input type="text" inputmode="numeric" class="form-control"
+                           id="room-id" name="room_id" value="{{ query }}"
+                           placeholder="Например, 1" aria-describedby="room-id-help">
+                </div>
+                <div class="col-12 col-md-auto d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-primary">Найти</button>
+                    <a href="{% url 'rooms:list' %}" class="btn btn-outline-secondary">Сбросить поиск</a>
+                </div>
+            </div>
+            <div id="room-id-help" class="form-text mt-2">
+                Введите положительное целое число. Пустое поле покажет все помещения.
+            </div>
+        </div>
+    </form>
+    {% if message %}
+        <div class="alert alert-{{ message_style }}" role="status">{{ message }}</div>
+    {% endif %}
+    <p class="text-secondary">{% if query %}Найдено помещений{% else %}Всего помещений{% endif %}: {{ rooms|length }}</p>
+    <div class="row g-4">
+        {% for room in rooms %}
+            <div class="col-12 col-md-6">
+                {% include "rooms_web/includes/room_card.html" with room=room only %}
+            </div>
+        {% empty %}
+            <p class="text-secondary">{% if query %}По вашему запросу помещения не найдены.{% else %}Помещения пока не добавлены.{% endif %}</p>
+        {% endfor %}
+    </div>
+{% endblock %}

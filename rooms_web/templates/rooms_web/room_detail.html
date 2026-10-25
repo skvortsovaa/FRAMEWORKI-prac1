@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{% if room %}{{ room.name|default:"Без названия" }}{% else %}Помещение не найдено{% endif %} | SmartSpace Monitor{% endblock %}
+{% block content %}
+    {% if room %}
+        <h1>{{ room.name|default:"Без названия" }}</h1>
+        <p class="text-secondary">Помещение №{{ room.id }}</p>
+        <div class="row g-4 mb-4">
+            <section class="col-12 col-md-6">
+                <div class="card room-card h-100 shadow-sm">
+                    <div class="card-body p-4">
+                        <h2 class="h4">О помещении</h2>
+                        <dl class="mb-0">
+                            <dt>ID</dt><dd>{{ room.id }}</dd>
+                            <dt>Этаж</dt><dd>{{ room.floor }}</dd>
+                            <dt>Площадь</dt><dd>{{ room.area|floatformat:"-2" }} м²</dd>
+                        </dl>
+                    </div>
+                </div>
+            </section>
+            <section class="col-12 col-md-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body p-4">
+                        <h2 class="h4">Датчик помещения</h2>
+                        {% include "sensors_web/includes/availability.html" with available=available only %}
+                        <dl>
+                            <dt>ID датчика</dt><dd>{{ sensor.id }}</dd>
+                            <dt>Активность</dt><dd>{{ sensor.active|yesno:"Включён,Отключён" }}</dd>
+                            <dt>Заряд</dt><dd>{{ sensor.battery }}%</dd>
+                        </dl>
+                        {% if sensor.battery < 20 %}
+                            <p class="text-warning-emphasis">Низкий заряд: рекомендуется обслуживание датчика.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+        </div>
+    {% else %}
+        <h1 class="text-danger">Помещение не найдено</h1>
+        <p>Помещения с ID {{ room_id }} нет в списке.</p>
+    {% endif %}
+    <a href="{% url 'rooms:list' %}" class="btn btn-outline-primary">К списку помещений</a>
+{% endblock %}
