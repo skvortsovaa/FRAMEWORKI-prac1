@@ -10,7 +10,7 @@
     {% if message %}<p class="alert alert-warning">{{ message }}</p>{% endif %}
     <div class="table-responsive mb-4">
         <table class="table table-striped"><thead><tr><th>Дата</th><th>Помещение</th><th>Датчик</th><th>Показатель</th><th>Значение</th><th>Норма при проверке</th><th>Статус</th></tr></thead>
-            <tbody>{% for item in readings %}<tr><td><a href="{% url 'reports:detail' item.report_id %}">{{ item.measured_at|slice:":10" }} {{ item.measured_at|slice:"11:" }}</a></td><td>{{ item.room_name }}</td><td>{{ item.sensor_id }}</td><td>{{ item.metric_name }}</td><td>{{ item.value|floatformat:"-2" }} {{ item.unit }}</td><td>{{ item.minimum|floatformat:"-2" }}–{{ item.maximum|floatformat:"-2" }} {{ item.unit }}</td><td>{% include "reports_web/includes/report_status.html" with status=item.status only %}</td></tr>{% empty %}<tr><td colspan="7">Измерения не найдены.</td></tr>{% endfor %}</tbody>
+            <tbody>{% for item in readings %}<tr><td><a href="{% url 'reports:detail' item.report_id %}">{% if orm_data %}{{ item.measured_at|date:"d.m.Y H:i:s" }}{% else %}{{ item.measured_at|slice:":10" }} {{ item.measured_at|slice:"11:" }}{% endif %}</a></td><td>{{ item.room_name }}</td><td>{{ item.sensor_id }}</td><td>{{ item.metric_name }}</td><td>{{ item.value|floatformat:"-2" }} {{ item.unit }}</td><td>{{ item.minimum|floatformat:"-2" }}–{{ item.maximum|floatformat:"-2" }} {{ item.unit }}</td><td>{% include "reports_web/includes/report_status.html" with status=item.status only %}</td></tr>{% empty %}<tr><td colspan="7">Измерения не найдены.</td></tr>{% endfor %}</tbody>
         </table>
     </div>
     <h2 class="h4">Справочник показателей</h2>

@@ -21,6 +21,7 @@
                 <div class="card h-100 shadow-sm">
                     <div class="card-body p-4">
                         <h2 class="h4">Датчик помещения</h2>
+                        {% if sensor %}
                         {% include "sensors_web/includes/availability.html" with available=available only %}
                         <dl>
                             <dt>ID датчика</dt><dd>{{ sensor.id }}</dd>
@@ -30,6 +31,7 @@
                         {% if sensor.battery < 20 %}
                             <p class="text-warning-emphasis">Низкий заряд: рекомендуется обслуживание датчика.</p>
                         {% endif %}
+                        {% else %}<p>Датчик ещё не установлен.</p>{% endif %}
                     </div>
                 </div>
             </section>

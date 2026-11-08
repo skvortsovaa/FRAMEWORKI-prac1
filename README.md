@@ -32,9 +32,150 @@
    * Конкретное измерение, полученное от датчика в определенный момент времени.
    * *Атрибуты:* временная метка (timestamp), числовое значение, статус (в норме / предупреждение / критично), привязка к датчику и показателю.
 
-## ПР7 текущая версия SQLite и SQL
+## ПР9 текущая версия Django ORM
 
-Веб-интерфейс по умолчанию получает данные из `data/smartspace.sqlite`
+SmartSpace Monitor продолжает проект ПР1–ПР7. Основной веб-режим теперь
+`SMARTSPACE_DATA_SOURCE = "orm"`: страницы используют модели Django и
+`db.sqlite3`. Исходная `data/smartspace.sqlite` сохранена как источник ПР7.
+Локальная база Django и резервные копии не включаются в Git.
+
+### Запуск ПР9
+
+После клонирования `https://github.com/skvortsovaa/FRAMEWORKI-prac1` перейти
+в папку проекта. Если окружения ещё нет, создать его и установить зависимости:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py import_pr7
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py runserver 8009 --insecure
+```
+
+Адрес: http://127.0.0.1:8009/. `--insecure` нужен для локальной раздачи статики
+при `DEBUG=False`. Если исходной базы ПР7 нет, сначала выполнить
+`python -m db.database` и `python -m db.import_json` из старого раздела ниже.
+Для административного CRUD: `manage.py createsuperuser`, затем `/admin/`.
+Исторические отчёты и измерения в админке доступны только для чтения.
+
+### Модели и стратегия переноса
+
+| Модель и файл | Поля и связи |
+| --- | --- |
+| `rooms_web/models.py`: Room | BigAutoField id; название CharField; этаж IntegerField; площадь FloatField > 0 |
+| `sensors_web/models.py`: Sensor | Строковый PK; OneToOneField room, PROTECT, related_name=sensor; active BooleanField; battery 0–100 |
+| `reports_web/models.py`: Metric | Строковый PK; имя, единица; FloatField minimum/maximum; минимум ≤ максимум |
+| Там же: Report | Строковый PK; ForeignKey room, PROTECT, related_name=reports; DateTimeField checked_at; историческое имя, состояние датчика, температура, влажность, протечка и статус |
+| Там же: Reading | Строковый PK; ForeignKey sensor/metric/report с PROTECT и related_name=readings; DateTimeField measured_at; значение и сохранённые нормы; UNIQUE(report, metric) |
+
+Три `0001_initial.py` создают новые таблицы в базе Django. Исходные таблицы
+ПР7 не изменяются. До работы сохранены копии обеих баз в `../tmp/pr9-backup/`.
+Перенос реализован в `db/import_sqlite_to_orm.py`, команда — `manage.py import_pr7`.
+Источник открывается в режиме только для чтения, проверяются целостность и FK.
+Порядок: помещения → датчики → показатели → отчёты → измерения.
+Каждая запись проходит `full_clean()`; все записи объединены `transaction.atomic()`.
+После записи сверяются все поля и идентификаторы связей. При ошибке — полный откат.
+
+Повторный одинаковый импорт ничего не меняет. Конфликт с изменённой записью
+завершает импорт без перезаписи; явный `--update` разрешает обновление совпадающих
+ID. Посторонние целевые записи не удаляются. `--source путь` выбирает источник.
+Результат переноса: **2 помещения, 2 датчика, 3 показателя, 1 отчёт, 3 измерения**.
+
+Дата без зоны из ПР7 трактуется как московская; ORM хранит DateTimeField с
+`USE_TZ=True`. Исторические имена и нормы независимы от текущих справочников.
+NULL означает отсутствие показаний, False означает сохранённое отсутствие
+протечки. PROTECT запрещает удаление используемых объектов. `full_clean()`
+проверяет правила модели; обычный `save()` не вызывает его автоматически.
+
+### Страницы и каталог ORM
+
+Основные запросы находятся в `orm_views.py` соответствующих приложений.
+`views.py` выбирают ORM по умолчанию. В таблице перечислены различные
+содержательные выборки, а не отдельные вызовы методов одной цепочки.
+
+| № | Выборка / сценарий | Использование |
+| --- | --- | --- |
+| 1 | Room.objects.all() | `/rooms/` |
+| 2 | Room.filter(pk=..., area__gte=...) | поиск ID с минимальной площадью |
+| 3 | Room.filter(name__iregex=...) | `/rooms/?q=серверная` |
+| 4 | Room.order_by("area", "id") | `/rooms/?sort=area` |
+| 5 | Room.select_related("sensor").get(pk=...) | `/rooms/1/` |
+| 6 | Sensor.select_related("room").order_by("id") | `/sensors/` |
+| 7 | Sensor.filter(active=True, battery__gt=0) | `/sensors/?available=1` |
+| 8 | Sensor.filter(Q(id...) or Q(room__name...)) | поиск датчика по ID или помещению |
+| 9 | Report.select_related("room").order_by("-checked_at", "id") | `/reports/` |
+| 10 | Report.filter(checked_at__date=..., status=...) | дата и статус отчёта |
+| 11 | Report.filter(room__pk=...) | фильтр помещения в истории |
+| 12 | Report.exclude(status="НЕТ ДАННЫХ") | `/reports/?exclude_no_data=1` |
+| 13 | Report.filter(Q(room_name...) or Q(room__name...) or Q(id...)) | поиск по историческому/текущему имени и ID |
+| 14 | Report.order_by("room__name", "-checked_at", "id") | `/reports/?sort=room` |
+| 15 | Report.select_related("room").get(pk=...) | карточка отчёта |
+| 16 | Room.values("id", "name").order_by("name", "id") | выбор помещения в форме истории |
+| 17 | Room.filter(~Exists(Report.filter(room_id=OuterRef("pk"), ...))) | `/rooms/uninspected/?date=2026-09-21` |
+| 18 | Room.aggregate(Count, Sum) | количество помещений и общая площадь |
+| 19 | Report.aggregate(Count, условные Count) | всего проверок, аварий, без данных |
+| 20 | Room.values().annotate(reports_count=Count("reports")) | статистика, включая нулевые группы |
+| 21 | Report.values("status").annotate(Count) | группировка по статусу |
+| 22 | counts.filter(reports_count__gt=...) | групповой порог, HAVING |
+| 23 | Metric.values().annotate(Count, Min, Max, Avg) | статистика измерений |
+| 24 | Reading.values(..., F("sensor__room__name"), F("metric__name"))[start:end] | `/reports/readings/?limit=2&offset=1` |
+| 25 | Metric.objects.all().order_by("id") | справочник на странице измерений |
+
+Минимум методички (15 разных выражений) покрыт; имеются получение набора и
+объекта, 4 вида фильтрации, 2 поиска, 2 сортировки, связи и оптимизация,
+агрегирование и группировка. История использует `Paginator`: `page_size` 1–100,
+`page` — номер страницы. Нечисловой номер даёт первую страницу, выход за границы —
+последнюю. Пустая выборка даёт пустую первую страницу. Шаблон
+`templates/includes/pagination.html` сохраняет GET-параметры через `querystring`.
+
+Сортировка выбирается из разрешённого словаря; произвольные поля не принимаются.
+Числа и ISO-даты проверяются. Поиск ограничен 200 символами; `iregex` с
+`re.escape()` ищет буквальный текст без учёта регистра, в том числе кириллицу
+(SQLite LIKE без расширений нечувствителен к регистру только для ASCII).
+Отсутствующие объекты дают 404, ошибки базы — общую страницу 503.
+
+### Проверки и защита
+
+```powershell
+.\.venv\Scripts\python.exe manage.py showmigrations
+.\.venv\Scripts\python.exe manage.py sqlmigrate reports_web 0001
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
+.\.venv\Scripts\python.exe manage.py demo_orm
+.\.venv\Scripts\python.exe -m pytest -v
+.\.venv\Scripts\python.exe -m flake8 .
+```
+
+`demo_orm` демонстрирует создание, чтение, изменение, удаление и PROTECT внутри
+транзакции с итоговым rollback. Исходные данные не меняются.
+`tests/test_orm.py` поднимает отдельную тестовую базу настоящими миграциями:
+перенос и его повтор, конфликт/откат, CRUD, связи, снимки, пустые группы,
+московские даты, поиск, пагинация, ошибки ввода и отсутствие N+1.
+SQL- и JSON-тесты прежних практик сохранены. Исправлена перепутанная подпись
+доступности датчика в общем шаблоне. Исключение E501 в flake8 относится только
+к автоматически сгенерированным миграциям.
+
+[Карта 30 пунктов защиты, Django shell и dumpdata/loaddata](docs/pr9-defense.md).
+Панель SQL включается только для локальной демонстрации:
+
+```powershell
+$env:SMARTSPACE_DEBUG = "1"
+.\.venv\Scripts\python.exe manage.py runserver 8009
+# Остановить сервер, затем:
+Remove-Item Env:SMARTSPACE_DEBUG
+```
+
+По умолчанию DEBUG выключен. JSON ПР6 и SQL ПР7 выбираются только явно через
+настройку `SMARTSPACE_DATA_SOURCE` и служат архивной реализацией для регрессии.
+Прямые SQL-запросы в `db/` нужны для исходной базы и инструментов ПР7;
+в обычном веб-запросе ORM они не выполняются.
+
+Автор: Скворцов Александр Александрович, ЭФБО-07-24.
+Рабочая ветка ПР9: `pr9-django-orm`; коммиты имеют префикс `PR9:`.
+
+## ПР7 архивная версия SQLite и SQL
+
+В архивном режиме `SMARTSPACE_DATA_SOURCE = "sqlite"` веб-интерфейс получает данные из `data/smartspace.sqlite`
 через стандартный `sqlite3`, без Django ORM. Служебная база Django
 `db.sqlite3` остаётся отдельной. Исходные JSON, консольная версия и
 классы ПР3 сохранены. Режим JSON ПР6 доступен явно через

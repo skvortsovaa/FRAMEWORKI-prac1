@@ -12,10 +12,24 @@
                            id="room-id" name="room_id" value="{{ query }}"
                            placeholder="Например, 1" aria-describedby="room-id-help">
                 </div>
-                {% if sql_data %}
+                {% if sql_data or orm_data %}
                     <div class="col-12 col-md-3">
                         <label for="min-area" class="form-label">Площадь от м²</label>
                         <input id="min-area" name="min_area" value="{{ min_area }}" type="number" min="0" step="any" class="form-control">
+                    </div>
+                {% endif %}
+                {% if orm_data %}
+                    <div class="col-12 col-md-6">
+                        <label for="room-search" class="form-label">Название помещения</label>
+                        <input id="room-search" name="q" value="{{ search }}" maxlength="200" class="form-control" placeholder="Часть названия">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label for="room-sort" class="form-label">Сортировка</label>
+                        <select id="room-sort" name="sort" class="form-select">
+                            <option value="id" {% if sort == 'id' %}selected{% endif %}>По ID</option>
+                            <option value="area" {% if sort == 'area' %}selected{% endif %}>По площади</option>
+                            <option value="name" {% if sort == 'name' %}selected{% endif %}>По названию</option>
+                        </select>
                     </div>
                 {% endif %}
                 <div class="col-12 col-md-auto d-flex gap-2 flex-wrap">

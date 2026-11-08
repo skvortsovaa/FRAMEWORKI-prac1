@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
@@ -11,3 +12,8 @@ urlpatterns = [
     path("sensors/", include("sensors_web.urls")),
     path("reports/", include("reports_web.urls")),
 ]
+
+if settings.DEBUG_TOOLBAR:
+    from debug_toolbar.toolbar import debug_toolbar_urls
+
+    urlpatterns += debug_toolbar_urls()

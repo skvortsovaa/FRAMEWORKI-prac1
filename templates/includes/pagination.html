@@ -1,0 +1,11 @@
+<nav class="d-flex flex-wrap gap-3 align-items-center mt-4" aria-label="Страницы истории">
+    {% if page_obj.has_previous %}
+        <a class="btn btn-outline-primary" href="{% querystring page=1 %}">Первая</a>
+        <a class="btn btn-outline-primary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+    {% endif %}
+    <span aria-current="page">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+        <a class="btn btn-outline-primary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>
+        <a class="btn btn-outline-primary" href="{% querystring page=page_obj.paginator.num_pages %}">Последняя</a>
+    {% endif %}
+</nav>

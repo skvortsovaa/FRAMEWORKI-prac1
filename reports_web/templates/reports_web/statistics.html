@@ -8,6 +8,7 @@
         <p class="col-md-3">Аварий: <strong>{{ totals.alarms }}</strong></p>
         <p class="col-md-3">Без данных: <strong>{{ totals.no_data }}</strong></p>
     </div>
+    {% if orm_data %}<p>Общая площадь: <strong>{{ rooms_total.total_area|floatformat:"-2" }} м²</strong></p>{% endif %}
     <h2 class="h4">Проверки по помещениям</h2>
     <div class="table-responsive mb-4">
         <table class="table table-striped"><thead><tr><th>Помещение</th><th>Проверок</th></tr></thead>

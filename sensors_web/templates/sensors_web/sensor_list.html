@@ -2,13 +2,15 @@
 {% block title %}Датчики | SmartSpace Monitor{% endblock %}
 {% block content %}
     <h1>Датчики</h1>
-    {% if sql_data %}
-        <form method="get" class="mb-3 d-flex gap-3 align-items-center">
+    {% if sql_data or orm_data %}
+        <form method="get" class="mb-3 d-flex flex-wrap gap-3 align-items-center">
+            {% if orm_data %}<div><label for="sensor-search" class="form-label">ID датчика или помещение</label><input id="sensor-search" class="form-control" name="q" maxlength="200" value="{{ search }}"></div>{% endif %}
             <label><input type="checkbox" name="available" value="1" {% if available_only %}checked{% endif %}> Только доступные</label>
             <button class="btn btn-primary" type="submit">Применить</button>
             <a class="btn btn-outline-secondary" href="{% url 'sensors:list' %}">Все датчики</a>
         </form>
     {% endif %}
+    {% if message %}<p class="alert alert-warning">{{ message }}</p>{% endif %}
     <p class="text-secondary">Всего датчиков: {{ sensors|length }}</p>
     <div class="card shadow-sm table-responsive">
         <table class="table table-hover align-middle mb-0" aria-label="Список датчиков">

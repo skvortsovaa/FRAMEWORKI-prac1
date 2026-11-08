@@ -3,7 +3,7 @@
 from django.conf import settings
 from django.shortcuts import render
 
-from . import sql_views
+from . import orm_views, sql_views
 
 from homepage.views import data_unavailable
 from smartspace_web.data import load_project_data
@@ -11,6 +11,8 @@ from smartspace_web.data import load_project_data
 
 def report_list(request):
     """Сохранённый порядок и снимки Report остаются неизменными."""
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.report_list(request)
     if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
         return sql_views.report_list(request)
     try:
@@ -23,6 +25,8 @@ def report_list(request):
 
 def report_detail(request, report_id):
     """Неизвестный строковый ID даёт шаблон с сообщением и статус 404."""
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.report_detail(request, report_id)
     if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
         return sql_views.report_detail(request, report_id)
     try:
@@ -37,3 +41,15 @@ def report_detail(request, report_id):
         request, "reports_web/report_detail.html", context,
         status=404 if report is None else 200,
     )
+
+
+def statistics(request):
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.statistics(request)
+    return sql_views.statistics(request)
+
+
+def readings(request):
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.readings(request)
+    return sql_views.readings(request)

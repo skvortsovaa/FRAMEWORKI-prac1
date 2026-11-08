@@ -3,7 +3,7 @@
 from django.conf import settings
 from django.shortcuts import render
 
-from . import sql_views
+from . import orm_views, sql_views
 
 from homepage.views import data_unavailable
 from models.rooms import get_room
@@ -13,6 +13,8 @@ from smartspace_web.data import load_project_data
 
 def room_list(request):
     """Список помещений с прежним поиском по положительному ID."""
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.room_list(request)
     if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
         return sql_views.room_list(request)
     try:
@@ -61,6 +63,8 @@ def room_list(request):
 
 def room_detail(request, room_id):
     """Объект или None передаётся в шаблон; HTTP-статус выбирает view."""
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.room_detail(request, room_id)
     if settings.SMARTSPACE_DATA_SOURCE == "sqlite":
         return sql_views.room_detail(request, room_id)
     try:
@@ -83,3 +87,9 @@ def room_detail(request, room_id):
         request, "rooms_web/room_detail.html", context,
         status=404 if room is None else 200,
     )
+
+
+def uninspected_rooms(request):
+    if settings.SMARTSPACE_DATA_SOURCE == "orm":
+        return orm_views.uninspected_rooms(request)
+    return sql_views.uninspected_rooms(request)

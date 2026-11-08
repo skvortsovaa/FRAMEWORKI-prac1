@@ -17,7 +17,7 @@ data/.save-backup.json
 # Локальные переменные окружения
 .env
 
-# Локальная служебная база Django (данные предметной области — в JSON)
+# Локальная база Django ORM ПР9 (создаётся миграциями и import_pr7)
 /db.sqlite3
 /db.sqlite3-journal
 /db.sqlite3-wal

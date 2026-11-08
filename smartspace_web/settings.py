@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,7 +27,7 @@ SECRET_KEY = (
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.environ.get("SMARTSPACE_DEBUG") == "1"
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
@@ -137,8 +138,17 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ПР7: отдельная SQLite предметной области; JSON оставлен для ПР6.
-SMARTSPACE_DATA_SOURCE = "sqlite"
+# ПР9: ORM по умолчанию; sqlite/json только для регрессии ПР7/ПР6.
+SMARTSPACE_DATA_SOURCE = "orm"
 SMARTSPACE_DB_PATH = Path(os.environ.get(
     "SMARTSPACE_DB_PATH", str(BASE_DIR / "data" / "smartspace.sqlite"),
 )).resolve()
+
+# Локальная демонстрация SQL для защиты ПР9; тесты работают без панели.
+DEBUG_TOOLBAR = (
+    DEBUG and "pytest" not in sys.modules and "test" not in sys.argv
+)
+if DEBUG_TOOLBAR:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    INTERNAL_IPS = ["127.0.0.1", "::1"]

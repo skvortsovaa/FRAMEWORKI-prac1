@@ -7,7 +7,7 @@
         <div class="card shadow-sm mb-4">
             <div class="card-body p-4">
                 <h2 class="h4">{{ report.room_name|default:"Без названия" }}</h2>
-                <p>{{ report.checked_at|slice:":10" }} {{ report.checked_at|slice:"11:" }} · {% include "reports_web/includes/report_status.html" with status=report.status only %}</p>
+                <p>{% if orm_data %}{{ report.checked_at|date:"d.m.Y H:i:s" }}{% else %}{{ report.checked_at|slice:":10" }} {{ report.checked_at|slice:"11:" }}{% endif %} · {% include "reports_web/includes/report_status.html" with status=report.status only %}</p>
                 <p class="text-secondary">Название, состояние датчика и нормы сохранены на момент проверки.</p>
                 <p>Датчик при проверке: <strong>{{ report.sensor_active|yesno:"Включён,Отключён" }}</strong>.
                     Заряд: <strong>{{ report.battery }}%</strong>.</p>
