@@ -262,11 +262,11 @@ def test_related_queries_do_not_grow_with_rows(orm_client):
     add_history(room)
     with CaptureQueriesContext(connection) as queries:
         client.get("/reports/?page_size=100")
-    # COUNT пагинации, список с JOIN, выбор помещений, COUNT навигации ПР10.
-    assert len(queries) == before == 4
+    # COUNT пагинации, список с JOIN, выбор помещений.
+    assert len(queries) == before == 3
     with CaptureQueriesContext(connection) as queries:
         client.get("/sensors/")
-    assert len(queries) == 2  # JOIN датчиков + общий счётчик помещений.
+    assert len(queries) == 1  # Датчики и помещения загружаются одним JOIN.
 
 
 @pytest.mark.parametrize("url", [
@@ -382,7 +382,7 @@ def test_pr10_context_available_on_multiple_pages_and_database_failure(
         response = client.get(url)
         assert response.context["site_name"] == "SmartSpace Monitor"
         assert response.context["navigation_rooms_count"] == 2
-        assert "Помещения (2)" in response.content.decode()
+        assert ">Помещения</a>" in response.content.decode()
     with patch.object(Room.objects, "count", side_effect=DatabaseError):
         assert client.get("/").status_code == 200
         with patch.object(Room.objects, "all", side_effect=DatabaseError):

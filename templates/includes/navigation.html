@@ -7,7 +7,7 @@
         </a>
         <nav class="nav mt-2" aria-label="Основная навигация">
             <a class="nav-link ps-0" href="{% url 'homepage:index' %}"{% if request.resolver_match.namespace == 'homepage' %} aria-current="page"{% endif %}>Главная</a>
-            <a class="nav-link" href="{% url 'rooms:list' %}"{% if request.resolver_match.namespace == 'rooms' %} aria-current="page"{% endif %}>Помещения{% if navigation_rooms_count != None %} ({{ navigation_rooms_count }}){% endif %}</a>
+            <a class="nav-link" href="{% url 'rooms:list' %}"{% if request.resolver_match.namespace == 'rooms' %} aria-current="page"{% endif %}>Помещения</a>
             <a class="nav-link" href="{% url 'sensors:list' %}"{% if request.resolver_match.namespace == 'sensors' %} aria-current="page"{% endif %}>Датчики</a>
             <a class="nav-link" href="{% url 'reports:list' %}"{% if request.resolver_match.namespace == 'reports' %} aria-current="page"{% endif %}>История проверок</a>
             <a class="nav-link" href="{% url 'rooms:uninspected' %}">Без проверки</a>
