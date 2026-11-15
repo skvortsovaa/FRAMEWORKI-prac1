@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.db.models import Count
+from django.db.models import Count, FloatField
+from django.forms import NumberInput
 
 from reports_web.admin import ReportInline
 from sensors_web.admin import SensorInline
@@ -31,6 +32,9 @@ class RoomAdmin(admin.ModelAdmin):
     )
     list_display_links = ("id", "name")
     list_editable = ("area",)
+    formfield_overrides = {
+        FloatField: {"widget": NumberInput(attrs={"style": "width:6em"})},
+    }
     search_fields = ("name",)
     list_filter = ("floor", LargeRoomFilter)
     ordering = ("name", "id")
@@ -49,7 +53,7 @@ class RoomAdmin(admin.ModelAdmin):
     def reports_count(self, obj):
         return obj.history_count
 
-    @admin.display(description="Большое помещение", boolean=True,
+    @admin.display(description="От 50 м²", boolean=True,
                    ordering="is_large")
     def large_room(self, obj):
         return obj.is_large if obj.pk else None
