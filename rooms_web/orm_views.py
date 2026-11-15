@@ -3,7 +3,7 @@
 import re
 
 from django.db.models import Exists, OuterRef
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 
 from reports_web.models import Report
 from smartspace_web.query_params import (
@@ -61,14 +61,24 @@ def room_detail(request, room_id):
 
 
 @database_page
+def room_detail_slug(request, slug):
+    room = get_object_or_404(Room.objects.select_related("sensor"), slug=slug)
+    sensor = getattr(room, "sensor", None)
+    return render(request, "rooms_web/room_detail.html", {
+        "room": room, "sensor": sensor, "orm_data": True,
+        "available": sensor.is_available() if sensor else False,
+    })
+
+
+@database_page
 def uninspected_rooms(request):
     selected_date = request.GET.get("date", "").strip()
     rooms, message = Room.objects.none(), ""
     try:
         day = date_value(selected_date)
         if day:
-            reports = Report.objects.filter(room_id=OuterRef("pk"),
-                                            checked_at__date=day)
+            reports = Report.objects.for_date(
+                day).filter(room_id=OuterRef("pk"))
             rooms = Room.objects.filter(~Exists(reports)).order_by("id")
     except ValueError:
         message = "Выберите корректную дату в формате ГГГГ-ММ-ДД."

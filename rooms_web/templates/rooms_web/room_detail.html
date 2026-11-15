@@ -13,6 +13,7 @@
                             <dt>ID</dt><dd>{{ room.id }}</dd>
                             <dt>Этаж</dt><dd>{{ room.floor }}</dd>
                             <dt>Площадь</dt><dd>{{ room.area|floatformat:"-2" }} м²</dd>
+                            {% if room.slug %}<dt>Большое помещение</dt><dd>{{ room.is_large|yesno:"Да,Нет" }}</dd>{% endif %}
                         </dl>
                     </div>
                 </div>

@@ -12,7 +12,7 @@
                 <p>Датчик при проверке: <strong>{{ report.sensor_active|yesno:"Включён,Отключён" }}</strong>.
                     Заряд: <strong>{{ report.battery }}%</strong>.</p>
                 <p>Протечка: <strong>{{ report.leak_detected|yesno:"Обнаружена,Не обнаружена,Нет данных" }}</strong>.</p>
-                {% if sql_data %}<a href="{% url 'rooms:detail' report.room_id %}">Открыть текущее помещение</a>{% else %}<a href="{% url 'rooms:detail' report.room.id %}">Открыть текущее помещение</a>{% endif %}
+                {% if sql_data %}<a href="{% url 'rooms:detail' report.room_id %}">Открыть текущее помещение</a>{% else %}<a href="{% if report.room.slug %}{{ report.room.get_absolute_url }}{% else %}{% url 'rooms:detail' report.room.id %}{% endif %}">Открыть текущее помещение</a>{% endif %}
             </div>
         </div>
         <h2 class="h4">Сохранённые показания</h2>

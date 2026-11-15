@@ -7,7 +7,7 @@ from smartspace_web.validators import nonblank_text
 
 
 class Sensor(models.Model):
-    id = models.CharField(primary_key=True, max_length=100,
+    id = models.CharField("Идентификатор", primary_key=True, max_length=100,
                           validators=[nonblank_text])
     room = models.OneToOneField(
         "rooms_web.Room", on_delete=models.PROTECT,

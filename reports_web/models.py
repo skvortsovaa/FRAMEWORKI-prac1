@@ -7,6 +7,7 @@ from django.db import models
 from models.metrics import analyze_metric
 from models.reports import get_room_status
 from smartspace_web.validators import finite_number, nonblank_text
+from .querysets import ReportQuerySet
 
 
 class Status(models.TextChoices):
@@ -17,12 +18,26 @@ class Status(models.TextChoices):
 
 
 class Metric(models.Model):
-    id = models.CharField(primary_key=True, max_length=100,
-                          validators=[nonblank_text])
-    name = models.CharField(max_length=200, validators=[nonblank_text])
-    unit = models.CharField(max_length=30, validators=[nonblank_text])
-    minimum = models.FloatField(validators=[finite_number])
-    maximum = models.FloatField(validators=[finite_number])
+    id = models.CharField(
+        verbose_name='Идентификатор',
+        primary_key=True,
+        max_length=100,
+        validators=[nonblank_text],
+    )
+    name = models.CharField(
+        verbose_name='Название',
+        max_length=200,
+        validators=[nonblank_text])
+    unit = models.CharField(
+        verbose_name='Единица измерения',
+        max_length=30,
+        validators=[nonblank_text])
+    minimum = models.FloatField(
+        verbose_name='Нижняя граница',
+        validators=[finite_number])
+    maximum = models.FloatField(
+        verbose_name='Верхняя граница',
+        validators=[finite_number])
 
     class Meta:
         ordering = ["id"]
@@ -45,32 +60,73 @@ class Metric(models.Model):
 
 
 class Report(models.Model):
-    id = models.CharField(primary_key=True, max_length=100,
-                          validators=[nonblank_text])
-    room = models.ForeignKey("rooms_web.Room", on_delete=models.PROTECT,
+    objects = ReportQuerySet.as_manager()
+
+    id = models.CharField(
+        verbose_name='Идентификатор',
+        primary_key=True,
+        max_length=100,
+        validators=[nonblank_text],
+    )
+    room = models.ForeignKey("rooms_web.Room", verbose_name="Помещение",
+                             on_delete=models.PROTECT,
                              related_name="reports")
-    room_name = models.CharField(max_length=200, validators=[nonblank_text])
-    checked_at = models.DateTimeField()
-    sensor_active = models.BooleanField()
+    room_name = models.CharField(
+        verbose_name='Помещение при проверке',
+        max_length=200,
+        validators=[nonblank_text])
+    checked_at = models.DateTimeField(verbose_name='Дата и время проверки')
+    sensor_active = models.BooleanField(verbose_name='Датчик был включён')
     battery = models.PositiveSmallIntegerField(
+        verbose_name='Заряд при проверке, %',
         validators=[MaxValueValidator(100)],
     )
-    temperature_value = models.FloatField(null=True, blank=True,
-                                          validators=[finite_number])
-    temperature_minimum = models.FloatField(null=True, blank=True,
-                                            validators=[finite_number])
-    temperature_maximum = models.FloatField(null=True, blank=True,
-                                            validators=[finite_number])
-    temperature_normal = models.BooleanField(null=True, blank=True)
-    humidity_value = models.FloatField(null=True, blank=True,
-                                       validators=[finite_number])
-    humidity_minimum = models.FloatField(null=True, blank=True,
-                                         validators=[finite_number])
-    humidity_maximum = models.FloatField(null=True, blank=True,
-                                         validators=[finite_number])
-    humidity_normal = models.BooleanField(null=True, blank=True)
-    leak_detected = models.BooleanField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices)
+    temperature_value = models.FloatField(
+        verbose_name='Температура, значение',
+        null=True,
+        blank=True,
+        validators=[finite_number],
+    )
+    temperature_minimum = models.FloatField(
+        verbose_name='Температура, нижняя граница',
+        null=True,
+        blank=True,
+        validators=[finite_number],
+    )
+    temperature_maximum = models.FloatField(
+        verbose_name='Температура, верхняя граница',
+        null=True,
+        blank=True,
+        validators=[finite_number],
+    )
+    temperature_normal = models.BooleanField(
+        verbose_name='Температура, в норме', null=True, blank=True)
+    humidity_value = models.FloatField(
+        verbose_name='Влажность, значение',
+        null=True,
+        blank=True,
+        validators=[finite_number],
+    )
+    humidity_minimum = models.FloatField(
+        verbose_name='Влажность, нижняя граница',
+        null=True,
+        blank=True,
+        validators=[finite_number],
+    )
+    humidity_maximum = models.FloatField(
+        verbose_name='Влажность, верхняя граница',
+        null=True,
+        blank=True,
+        validators=[finite_number],
+    )
+    humidity_normal = models.BooleanField(
+        verbose_name='Влажность, в норме', null=True, blank=True)
+    leak_detected = models.BooleanField(
+        verbose_name='Обнаружена протечка', null=True, blank=True)
+    status = models.CharField(
+        verbose_name='Статус',
+        max_length=20,
+        choices=Status.choices)
 
     class Meta:
         ordering = ["-checked_at", "id"]
@@ -151,19 +207,33 @@ class Report(models.Model):
 
 
 class Reading(models.Model):
-    id = models.CharField(primary_key=True, max_length=100,
-                          validators=[nonblank_text])
-    sensor = models.ForeignKey("sensors_web.Sensor", on_delete=models.PROTECT,
+    id = models.CharField(
+        verbose_name='Идентификатор',
+        primary_key=True,
+        max_length=100,
+        validators=[nonblank_text],
+    )
+    sensor = models.ForeignKey("sensors_web.Sensor", verbose_name="Датчик",
+                               on_delete=models.PROTECT,
                                related_name="readings")
-    metric = models.ForeignKey(Metric, on_delete=models.PROTECT,
+    metric = models.ForeignKey(Metric, verbose_name="Показатель",
+                               on_delete=models.PROTECT,
                                related_name="readings")
-    report = models.ForeignKey(Report, on_delete=models.PROTECT,
+    report = models.ForeignKey(Report, verbose_name="Отчёт",
+                               on_delete=models.PROTECT,
                                related_name="readings")
-    measured_at = models.DateTimeField(db_index=True)
-    value = models.FloatField(validators=[finite_number])
-    minimum = models.FloatField(validators=[finite_number])
-    maximum = models.FloatField(validators=[finite_number])
-    status = models.CharField(max_length=20, choices=[
+    measured_at = models.DateTimeField(
+        verbose_name='Время измерения', db_index=True)
+    value = models.FloatField(
+        verbose_name='Значение',
+        validators=[finite_number])
+    minimum = models.FloatField(
+        verbose_name='Нижняя граница',
+        validators=[finite_number])
+    maximum = models.FloatField(
+        verbose_name='Верхняя граница',
+        validators=[finite_number])
+    status = models.CharField(verbose_name='Статус', max_length=20, choices=[
         choice for choice in Status.choices if choice[0] != Status.NO_DATA
     ])
 

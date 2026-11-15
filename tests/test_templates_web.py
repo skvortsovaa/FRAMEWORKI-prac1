@@ -96,8 +96,9 @@ def test_namespaces_and_integer_converter(template_client):
     match = resolve("/rooms/7/")
     assert match.view_name == "rooms:detail"
     assert match.kwargs == {"room_id": 7}
+    assert resolve("/rooms/text/").view_name == "rooms:detail-slug"
     with pytest.raises(Resolver404):
-        resolve("/rooms/text/")
+        resolve("/rooms/text/extra/")
 
 
 def test_default_and_missing_variables(template_client):

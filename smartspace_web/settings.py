@@ -42,9 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     "homepage",
-    "rooms_web",
-    "sensors_web",
-    "reports_web",
+    "rooms_web.apps.RoomsWebConfig",
+    "sensors_web.apps.SensorsWebConfig",
+    "reports_web.apps.ReportsWebConfig",
 ]
 
 MIDDLEWARE = [
@@ -69,6 +69,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'smartspace_web.context_processors.room_context',
             ],
         },
     },

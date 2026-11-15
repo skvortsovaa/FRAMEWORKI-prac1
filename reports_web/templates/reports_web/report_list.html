@@ -59,7 +59,7 @@
                         <td>{{ report.room_name|default:"Без названия" }}</td>
                         <td>{% include "reports_web/includes/report_status.html" with status=report.status only %}</td>
                         {% if sql_data %}<td><a href="{% url 'rooms:detail' report.room_id %}">{{ report.current_room_name }}</a></td>{% endif %}
-                        {% if orm_data %}<td><a href="{% url 'rooms:detail' report.room_id %}">{{ report.room.name }}</a></td>{% endif %}
+                        {% if orm_data %}<td><a href="{{ report.room.get_absolute_url }}">{{ report.room.name }}</a></td>{% endif %}
                     </tr>
                 {% empty %}
                     <tr><td colspan="4" class="text-secondary">{% if selected_date or selected_status %}По выбранным условиям проверки не найдены.{% else %}Проверок пока нет.{% endif %}</td></tr>

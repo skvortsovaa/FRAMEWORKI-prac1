@@ -41,13 +41,13 @@ def report_list(request):
             raise ValueError
         size = integer(page_size, 1, 100)
         if day:
-            reports = reports.filter(checked_at__date=day)
+            reports = reports.for_date(day)
         if status:
             reports = reports.filter(status=status)
         if room_id:
-            reports = reports.filter(room__pk=integer(room_id, 1))
+            reports = reports.for_room(integer(room_id, 1))
         if exclude_no_data == "1":
-            reports = reports.exclude(status=Status.NO_DATA)
+            reports = reports.with_data()
         if search:
             pattern = re.escape(search)
             reports = reports.filter(Q(room_name__iregex=pattern)

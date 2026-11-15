@@ -21,7 +21,7 @@
                 {% for sensor in sensors %}
                     <tr>
                         <th scope="row">{{ sensor.id }}</th>
-                        <td>{% if sql_data %}<a href="{% url 'rooms:detail' sensor.room_id %}">{{ sensor.room_name }}</a>{% else %}<a href="{% url 'rooms:detail' sensor.room.id %}">{{ sensor.room.name|default:"Без названия" }}</a>{% endif %}</td>
+                        <td>{% if sql_data %}<a href="{% url 'rooms:detail' sensor.room_id %}">{{ sensor.room_name }}</a>{% else %}<a href="{% if sensor.room.slug %}{{ sensor.room.get_absolute_url }}{% else %}{% url 'rooms:detail' sensor.room.id %}{% endif %}">{{ sensor.room.name|default:"Без названия" }}</a>{% endif %}</td>
                         <td>{{ sensor.active|yesno:"Включён,Отключён" }}</td>
                         <td>{{ sensor.battery }}%{% if sensor.battery < 20 %}<div class="small text-warning-emphasis">Низкий заряд: рекомендуется обслуживание.</div>{% endif %}</td>
                         <td>{% if sql_data %}{% include "sensors_web/includes/availability.html" with available=sensor.available only %}{% else %}{% include "sensors_web/includes/availability.html" with available=sensor.is_available only %}{% endif %}</td>

@@ -93,3 +93,7 @@ def uninspected_rooms(request):
     if settings.SMARTSPACE_DATA_SOURCE == "orm":
         return orm_views.uninspected_rooms(request)
     return sql_views.uninspected_rooms(request)
+
+
+def room_detail_slug(request, slug):
+    return orm_views.room_detail_slug(request, slug)

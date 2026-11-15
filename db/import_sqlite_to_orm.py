@@ -43,6 +43,9 @@ def normalize(model, row):
     row = dict(row)
     for field in model._meta.fields:
         name = field.attname
+        # ПР10 добавляет slug и GeneratedField, которых нет в источнике ПР7.
+        if name not in row:
+            continue
         value = row[name]
         if field.get_internal_type() == "BooleanField" and value is not None:
             if type(value) is not int or value not in (0, 1):
